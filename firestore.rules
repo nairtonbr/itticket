@@ -1,0 +1,147 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: tickets
+    // Document ID: auto-generated or custom string
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required, 1-200 chars)
+    //   - description: string (optional, 0-2000 chars)
+    //   - client: string (required, enum)
+    //   - status: string (required, enum)
+    //   - category: string (optional, enum)
+    //   - responsible: string (optional)
+    //   - sla: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (optional)
+    //   - updates: list of maps (optional)
+    //   - attachments: list of maps (optional)
+    //
+    // Collection: settings
+    // Document ID: global
+    // Fields:
+    //   - webhookUrl: string (optional, URL)
+    //   - clientLogos: map (optional)
+    //   - clientResponsibles: map (optional)
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - uid: string (required, matches doc ID)
+    //   - email: string (required, PII)
+    //   - displayName: string (optional)
+    //   - role: string (required, admin|user|client)
+    //   - associatedClient: string (optional, for role=='client')
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "NairtonBraga00@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isUser() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user';
+    }
+
+    function isClient() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'client';
+    }
+
+    function getAssociatedClient() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.associatedClient;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidTicket(data) {
+      return data.keys().hasAll(['title', 'client', 'status', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.client in ['Avançar', 'Bixnet', 'Brasilink', 'Iplay', 'Jrnet', 'Meconnect', 'Nexo'] &&
+             data.status in ['Aberto', 'Em Andamento', 'Aguardando Cliente', 'Aguardando Terceiros', 'Resolvido'] &&
+             (!('category' in data) || data.category in ['ENGENHARIA IP', 'INFRAESTRUTURA', 'NOC', 'PROJETOS', 'NÍVEL3']) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('updates' in data) || data.updates is list) &&
+             (!('attachments' in data) || data.attachments is list);
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'user', 'client'] &&
+             (!('associatedClient' in data) || data.associatedClient is string);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can only read their own profile (PII protection)
+      // Admins can read all profiles
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Creation: Users can create their own profile as 'client' by default
+      // Admins can create any profile
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ( (isOwner(userId) && request.resource.data.role == 'client') || isAdmin() );
+      
+      // Update: Users can update their own profile but NOT their role
+      // Admins can update anything
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
+                    ( (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() );
+    }
+
+    match /tickets/{ticketId} {
+      // Read: Admins and internal users see all. Clients see only their associated client tickets.
+      allow read: if isAdmin() || isUser() || (isClient() && resource.data.client == getAssociatedClient());
+      
+      // Create: Admins and users can create for any client. Clients can only create for themselves.
+      allow create: if isAuthenticated() && isValidTicket(request.resource.data) &&
+                    (isAdmin() || isUser() || (isClient() && request.resource.data.client == getAssociatedClient()));
+      
+      // Update: Admins and users can update any ticket. Clients can only update their own client's tickets.
+      allow update: if isAuthenticated() && isValidTicket(request.resource.data) &&
+                    (isAdmin() || isUser() || (isClient() && resource.data.client == getAssociatedClient()));
+      
+      // Delete: Only admins
+      allow delete: if isAdmin();
+    }
+
+    match /settings/global {
+      // Read: Any authenticated user
+      allow read: if isAuthenticated();
+      
+      // Write: Only admins
+      allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "entities": {
+    "Ticket": {
+      "title": "Ticket",
+      "description": "A support ticket",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "client": { "type": "string", "enum": ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo"] },
+        "status": { "type": "string", "enum": ["Aberto", "Em Andamento", "Aguardando Cliente", "Aguardando Terceiros", "Resolvido"] },
+        "category": { "type": "string", "enum": ["ENGENHARIA IP", "INFRAESTRUTURA", "NOC", "PROJETOS", "NÍVEL3"] },
+        "responsible": { "type": "string" },
+        "sla": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "author": { "type": "string" },
+              "content": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "size": { "type": "number" }
+            }
+          }
+        }
+      },
+      "required": ["title", "client", "status", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Application settings",
+      "type": "object",
+      "properties": {
+        "webhookUrl": { "type": "string" },
+        "clientLogos": { "type": "object" },
+        "clientResponsibles": { "type": "object" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user", "client"] },
+        "associatedClient": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/tickets/{ticketId}": {
+      "schema": "Ticket",
+      "description": "Collection of support tickets"
+    },
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Global application settings"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of users"
+    }
+  }
+}
