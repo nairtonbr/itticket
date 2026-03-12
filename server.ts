@@ -52,10 +52,10 @@ db.exec(`
 
 // Seed default admin if not exists
 const adminEmail = "NairtonBraga00@gmail.com";
-const adminExists = db.prepare("SELECT * FROM users WHERE email = ?").get(adminEmail);
+const hashedPassword = bcrypt.hashSync("admin123", 10);
+const adminExists = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(adminEmail);
 
 if (!adminExists) {
-  const hashedPassword = bcrypt.hashSync("admin123", 10);
   db.prepare("INSERT INTO users (id, email, password, displayName, role) VALUES (?, ?, ?, ?, ?)").run(
     "admin-id",
     adminEmail,
@@ -64,6 +64,10 @@ if (!adminExists) {
     "admin"
   );
   console.log("Admin user created.");
+} else {
+  // Force update password to ensure it's admin123
+  db.prepare("UPDATE users SET password = ? WHERE LOWER(email) = LOWER(?)").run(hashedPassword, adminEmail);
+  console.log("Admin password updated.");
 }
 
 async function startServer() {
@@ -90,9 +94,20 @@ async function startServer() {
   // Auth Routes
   app.post("/api/login", (req, res) => {
     const { email, password } = req.body;
-    const user: any = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    console.log(`Login attempt for: ${email}`);
+    
+    // Case-insensitive search
+    const user: any = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(email);
 
-    if (!user || !bcrypt.compareSync(password, user.password)) {
+    if (!user) {
+      console.log(`User not found: ${email}`);
+      return res.status(401).json({ message: "Credenciais inválidas" });
+    }
+
+    const passwordMatch = bcrypt.compareSync(password, user.password);
+    console.log(`Password match for ${email}: ${passwordMatch}`);
+
+    if (!passwordMatch) {
       return res.status(401).json({ message: "Credenciais inválidas" });
     }
 
