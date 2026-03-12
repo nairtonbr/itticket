@@ -77,6 +77,11 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // Auth Middleware
   const authenticateToken = (req: any, res: any, next: any) => {
     const authHeader = req.headers['authorization'];

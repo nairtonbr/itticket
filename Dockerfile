@@ -1,30 +1,23 @@
-# Build stage
-FROM node:20-slim AS build
+FROM node:20-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Instalar dependências para o SQLite
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
+COPY package*.json ./
 RUN npm install
 
-# Copy source files
 COPY . .
 
-# Build the application
-# Note: Vite environment variables must be present at build time if they are to be baked in
+# Build do frontend
 RUN npm run build
 
-# Production stage
-FROM nginx:stable-alpine
-
-# Copy built files from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy custom nginx config for SPA routing
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+# Expor a porta 3000
 EXPOSE 3000
 
-CMD ["nginx", "-g", "daemon off;"]
+# Variáveis de ambiente padrão
+ENV NODE_ENV=production
+ENV PORT=3000
+
+CMD ["npm", "run", "start"]
