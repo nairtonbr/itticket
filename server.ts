@@ -51,16 +51,19 @@ db.exec(`
 `);
 
 // Seed default admin if not exists
-const adminExists = db.prepare("SELECT * FROM users WHERE email = ?").get("NairtonBraga00@gmail.com");
+const adminEmail = "NairtonBraga00@gmail.com";
+const adminExists = db.prepare("SELECT * FROM users WHERE email = ?").get(adminEmail);
+
 if (!adminExists) {
   const hashedPassword = bcrypt.hashSync("admin123", 10);
   db.prepare("INSERT INTO users (id, email, password, displayName, role) VALUES (?, ?, ?, ?, ?)").run(
     "admin-id",
-    "NairtonBraga00@gmail.com",
+    adminEmail,
     hashedPassword,
     "Nairton Braga",
     "admin"
   );
+  console.log("Admin user created.");
 }
 
 async function startServer() {
