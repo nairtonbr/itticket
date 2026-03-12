@@ -1,6 +1,7 @@
 export type ClientName = "Avançar" | "Bixnet" | "Brasilink" | "Iplay" | "Jrnet" | "Meconnect" | "Nexo";
 export type TicketStatus = "Aberto" | "Em Andamento" | "Aguardando Cliente" | "Aguardando Terceiros" | "Resolvido";
-export type TicketCategory = "ENGENHARIA IP" | "INFRAESTRUTURA" | "NOC" | "PROJETOS" | "NÍVEL3";
+export type TicketCategory = "Suporte" | "Vendas" | "Financeiro" | "Engenharia" | "Infraestrutura";
+export type TicketPriority = "Baixa" | "Média" | "Alta" | "Urgente";
 
 export interface TicketAttachment {
   name: string;
@@ -22,6 +23,9 @@ export interface Ticket {
   client: ClientName;
   status: TicketStatus;
   category?: TicketCategory;
+  priority?: TicketPriority;
+  totalHours?: number;
+  billedHours?: number;
   responsible: string;
   sla: string;
   createdAt: any; // Firestore Timestamp

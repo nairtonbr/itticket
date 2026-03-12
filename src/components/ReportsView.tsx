@@ -356,14 +356,20 @@ export default function ReportsView({ tickets, darkMode }: ReportsViewProps) {
 
 function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
   return (
-    <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col gap-4">
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${color}`}>
-        {icon}
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-zinc-900 p-8 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col gap-6 group hover:border-blue-500/50 transition-all duration-300"
+    >
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${color}`}>
+        <div className="w-6 h-6">
+          {icon}
+        </div>
       </div>
-      <div>
-        <p className="text-3xl font-bold text-zinc-900 dark:text-white">{value}</p>
-        <p className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-1">{label}</p>
+      <div className="space-y-1">
+        <p className="text-4xl font-black text-zinc-900 dark:text-white tracking-tight">{value}</p>
+        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{label}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -33,3 +33,22 @@ export const formatFirestoreDate = (date: any, formatStr: string = "dd/MM/yyyy H
   if (!dateObj) return "-";
   return format(dateObj, formatStr, { locale: ptBR });
 };
+
+export const getTimeOpen = (date: any): string => {
+  const dateObj = getFirestoreDate(date);
+  if (!dateObj) return "-";
+  
+  const now = new Date();
+  const diffInMs = now.getTime() - dateObj.getTime();
+  
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInMinutes = Math.floor((diffInMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (diffInHours > 24) {
+    const days = Math.floor(diffInHours / 24);
+    const hours = diffInHours % 24;
+    return `${days}d ${hours}h ${diffInMinutes}m`;
+  }
+  
+  return `${diffInHours}h ${diffInMinutes}m`;
+};

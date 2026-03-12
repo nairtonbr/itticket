@@ -102,17 +102,22 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
             >
               <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-3">
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">#{ticket.id.substring(0, 8)}</span>
+                  <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">#{ticket.id.substring(0, 8)}</span>
                   {isExpired && <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 justify-end">
-                  <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white/50 dark:bg-zinc-900/50 whitespace-nowrap`}>
+                  {ticket.priority && (
+                    <div className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700">
+                      {ticket.priority}
+                    </div>
+                  )}
+                  <div className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white/50 dark:bg-zinc-900/50 whitespace-nowrap`}>
                     {ticket.client}
                   </div>
                 </div>
               </div>
               
-              <h4 className="font-semibold text-zinc-900 dark:text-white mb-3 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              <h4 className="font-medium text-zinc-900 dark:text-white mb-3 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                 {ticket.title}
               </h4>
 
@@ -145,7 +150,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
                       style={{ width: `${slaProgress}%` }} 
                     />
                   </div>
-                  <span className={`text-[10px] font-bold whitespace-nowrap ${
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${
                     isExpired ? "text-red-500" : isApproaching ? "text-yellow-500" : "text-blue-600 dark:text-blue-400"
                   }`}>
                     {ticket.sla}

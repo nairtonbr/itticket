@@ -69,6 +69,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
             <div className="flex-1 px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Título</div>
             <div className="w-[150px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Cliente</div>
             <div className="w-[150px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Status</div>
+            <div className="w-[120px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Prioridade</div>
             <div className="w-[150px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Categoria</div>
             <div className="w-[180px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Responsável</div>
             <div className="w-[100px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">SLA</div>
@@ -93,7 +94,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                 >
                   <div className="w-[120px] px-6 py-4 shrink-0 overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 truncate" title={ticket.id}>
+                      <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 truncate" title={ticket.id}>
                         #{ticket.id.substring(0, 8)}...
                       </span>
                       {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
@@ -101,10 +102,10 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   </div>
                   <div className="flex-1 px-6 py-4 overflow-hidden">
                     <div className="max-w-md">
-                      <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                      <p className="font-medium text-sm text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {ticket.title}
                       </p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500 truncate">
                         {ticket.description}
                       </p>
                     </div>
@@ -116,11 +117,20 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   </div>
                   <div className="w-[150px] px-6 py-4 shrink-0">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLORS[ticket.status]}`} />
-                      <span className={`text-[10px] font-bold uppercase tracking-wider truncate ${STATUS_TEXT_COLORS[ticket.status]}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_COLORS[ticket.status]}`} />
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider truncate ${STATUS_TEXT_COLORS[ticket.status]}`}>
                         {ticket.status}
                       </span>
                     </div>
+                  </div>
+                  <div className="w-[120px] px-6 py-4 shrink-0">
+                    {ticket.priority ? (
+                      <span className="inline-block text-[10px] font-bold px-2 py-1 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-zinc-500 border border-zinc-100 dark:border-zinc-700 whitespace-nowrap uppercase tracking-wider">
+                        {ticket.priority}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-zinc-400 dark:text-zinc-600">-</span>
+                    )}
                   </div>
                   <div className="w-[150px] px-6 py-4 shrink-0">
                     {ticket.category ? (

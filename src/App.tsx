@@ -15,12 +15,15 @@ import {
   LayoutDashboard,
   FileText,
   AlertCircle,
+  CheckCircle2,
+  Clock,
   Menu,
   X,
   Lock,
   Mail
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Toaster, toast } from "react-hot-toast";
 import KanbanBoard from "./components/KanbanBoard";
 import TicketList from "./components/TicketList";
 import TicketModal from "./components/TicketModal";
@@ -222,9 +225,13 @@ export default function App() {
         setTickets(prev => [newTicket, ...prev]);
         await sendWebhook(newTicket, settings, "create");
         setIsModalOpen(false);
+        toast.success("Chamado criado com sucesso!");
+      } else {
+        toast.error("Erro ao criar chamado.");
       }
     } catch (error) {
       console.error("Error creating ticket:", error);
+      toast.error("Erro de conexão.");
     }
   };
 
@@ -245,9 +252,36 @@ export default function App() {
         if (updatedTicket) {
           await sendWebhook({ ...updatedTicket, ...updates }, settings, "update");
         }
+        toast.success("Chamado atualizado!");
+      } else {
+        toast.error("Erro ao atualizar chamado.");
       }
     } catch (error) {
       console.error("Error updating ticket:", error);
+      toast.error("Erro de conexão.");
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: "DELETE",
+        headers: { 
+          "Authorization": `Bearer ${user.token}`
+        }
+      });
+      
+      if (res.ok) {
+        setTickets(prev => prev.filter(t => t.id !== ticketId));
+        toast.success("Chamado excluído com sucesso!");
+        setIsModalOpen(false);
+      } else {
+        const data = await res.json();
+        toast.error(data.message || "Erro ao excluir chamado.");
+      }
+    } catch (error) {
+      console.error("Error deleting ticket:", error);
+      toast.error("Erro de conexão.");
     }
   };
 
@@ -272,7 +306,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950">
+      <div className={`flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950 ${darkMode ? 'dark' : ''}`}>
         <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -280,7 +314,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4">
+      <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4 ${darkMode ? 'dark' : ''}`}>
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -352,19 +386,33 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900 ${darkMode ? 'dark' : ''}`}>
+      <Toaster position="top-right" />
       {/* Sidebar */}
-      <aside className={`
-        fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800 transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="h-full flex flex-col p-6">
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 dark:shadow-none">
-              <Layout className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">IT TICKET</span>
-          </div>
+      <AnimatePresence mode="wait">
+        {isSidebarOpen && (
+          <motion.aside 
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -300, opacity: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800 lg:static shrink-0"
+          >
+            <div className="h-full flex flex-col p-6">
+              <div className="flex items-center justify-between mb-10 px-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 dark:shadow-none">
+                    <Layout className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">IT TICKET</span>
+                </div>
+                <button 
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl lg:hidden"
+                >
+                  <X className="w-5 h-5 text-zinc-400" />
+                </button>
+              </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto pr-2 custom-scrollbar">
             <div className="mb-4">
@@ -427,7 +475,9 @@ export default function App() {
             </button>
           </div>
         </div>
-      </aside>
+      </motion.aside>
+      )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -436,9 +486,10 @@ export default function App() {
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl lg:hidden"
+              className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400 border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
+              title={isSidebarOpen ? "Recolher Menu" : "Expandir Menu"}
             >
-              <Menu className="w-6 h-6 text-zinc-600 dark:text-zinc-400" />
+              <Menu className="w-5 h-5" />
             </button>
             <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
               {activeTab === "dashboard" ? "Visão Geral" : activeTab === "reports" ? "Relatórios" : activeTab === "settings" ? "Configurações" : activeTab}
@@ -457,7 +508,7 @@ export default function App() {
 
             <div className="flex items-center gap-2 md:gap-3">
               <button 
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={() => setDarkMode(prev => !prev)}
                 className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400"
               >
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -482,7 +533,7 @@ export default function App() {
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-zinc-50/50 dark:bg-zinc-950/50 custom-scrollbar">
-          <div className="max-w-7xl mx-auto space-y-10">
+          <div className="max-w-full mx-auto space-y-10">
             {activeTab === "settings" ? (
               <SettingsView 
                 isAdmin={userProfile?.role === "admin"} 
@@ -494,28 +545,53 @@ export default function App() {
             ) : (
               <>
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
                   {[
-                    { label: "Total", value: ticketsByTab.length, color: "blue" },
-                    { label: "Abertos", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "green" },
-                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "amber" },
-                    { label: "Aguardando", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros").length, color: "purple" }
+                    { label: "Total de Tickets", value: ticketsByTab.length, color: "blue", icon: <BarChart3 /> },
+                    { label: "Resolvidos", value: ticketsByTab.filter(t => t.status === "Resolvido").length, color: "green", icon: <CheckCircle2 /> },
+                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle /> },
+                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "yellow", icon: <Clock /> },
+                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon /> },
+                    { label: "Média de Resposta", value: "2.4h", color: "indigo", icon: <Clock /> }
                   ].map((stat, i) => (
                     <motion.button
                       key={stat.label}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.1 }}
-                      onClick={() => setStatusFilter(stat.label as any)}
-                      className={`p-6 md:p-8 rounded-[2rem] border transition-all duration-300 text-left group relative overflow-hidden ${
-                        statusFilter === stat.label 
+                      onClick={() => {
+                        if (stat.label === "Total de Tickets") setStatusFilter("Total");
+                        else if (stat.label === "Resolvidos") setStatusFilter("Resolvido");
+                        else if (stat.label === "Em Aberto") setStatusFilter("Aberto");
+                        else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
+                        else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
+                      }}
+                      className={`p-6 rounded-[1.5rem] border transition-all duration-300 text-left group relative overflow-hidden flex flex-col gap-4 ${
+                        (statusFilter === "Total" && stat.label === "Total de Tickets") ||
+                        (statusFilter === "Resolvido" && stat.label === "Resolvidos") ||
+                        (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
+                        (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
+                        (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente")
                           ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-xl shadow-blue-100/50 dark:shadow-none ring-1 ring-blue-500" 
                           : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm"
                       }`}
                     >
-                      <div className={`absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 rounded-full opacity-5 group-hover:scale-110 transition-transform duration-500 bg-${stat.color}-500`}></div>
-                      <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3">{stat.label}</p>
-                      <p className="text-3xl md:text-4xl font-black text-zinc-900 dark:text-white tracking-tight">{stat.value}</p>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${
+                        stat.color === "blue" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                        stat.color === "green" ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                        stat.color === "red" ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
+                        stat.color === "yellow" ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400" :
+                        stat.color === "purple" ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" :
+                        "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+                      }`}>
+                        <div className="w-5 h-5">
+                          {stat.icon}
+                        </div>
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">{stat.value}</p>
+                        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{stat.label}</p>
+                      </div>
                     </motion.button>
                   ))}
                 </div>
@@ -584,6 +660,7 @@ export default function App() {
             ticket={selectedTicket}
             onCreate={handleCreateTicket}
             onUpdate={handleUpdateTicket}
+            onDelete={handleDeleteTicket}
             user={userProfile}
             activeClient={activeTab !== "dashboard" && activeTab !== "reports" && activeTab !== "settings" ? activeTab : undefined}
             clientResponsibles={settings.clientResponsibles}

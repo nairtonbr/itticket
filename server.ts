@@ -240,6 +240,19 @@ async function startServer() {
     
     res.json({ message: "Ticket atualizado" });
   });
+  
+  app.delete("/api/tickets/:id", authenticateToken, (req: any, res) => {
+    const { id } = req.params;
+    const userRole = req.user.role;
+    
+    // Only admins or users can delete tickets
+    if (userRole !== 'admin' && userRole !== 'user') {
+      return res.status(403).json({ message: "Sem permissão para excluir chamados" });
+    }
+    
+    db.prepare("DELETE FROM tickets WHERE id = ?").run(id);
+    res.json({ message: "Ticket excluído com sucesso" });
+  });
 
   // Settings Routes
   app.get("/api/settings", authenticateToken, (req, res) => {
