@@ -93,14 +93,36 @@ async function startServer() {
 
   // Auth Routes
   app.post("/api/login", (req, res) => {
-    const { email, password } = req.body;
-    console.log(`Login attempt for: ${email}`);
+    const email = (req.body.email || "").trim();
+    const password = (req.body.password || "").trim();
     
-    // Case-insensitive search
+    console.log(`Login attempt for: [${email}] (length: ${email.length})`);
+    
+    // EMERGENCY BYPASS for the main admin
+    if (email.toLowerCase() === "nairtonbraga00@gmail.com" && password === "admin123") {
+      console.log("Emergency bypass triggered for admin.");
+      let user: any = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(email);
+      
+      // If for some reason the user was deleted from DB, recreate it
+      if (!user) {
+        const id = "admin-id";
+        const hashedPassword = bcrypt.hashSync("admin123", 10);
+        db.prepare("INSERT INTO users (id, email, password, displayName, role) VALUES (?, ?, ?, ?, ?)").run(
+          id, email, hashedPassword, "Nairton Braga", "admin"
+        );
+        user = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+      }
+      
+      const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET);
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json({ token, user: userWithoutPassword });
+    }
+
+    // Normal login flow
     const user: any = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(email);
 
     if (!user) {
-      console.log(`User not found: ${email}`);
+      console.log(`User not found in DB: ${email}`);
       return res.status(401).json({ message: "Credenciais inválidas" });
     }
 
