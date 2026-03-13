@@ -17,6 +17,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  ShieldAlert,
   Menu,
   X,
   Lock,
@@ -30,7 +31,7 @@ import TicketModal from "./components/TicketModal";
 import SettingsView from "./components/SettingsView";
 import ReportsView from "./components/ReportsView";
 import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile } from "./types";
-import { CLIENTS, STATUSES } from "./constants";
+import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
 
 export default function App() {
@@ -48,6 +49,16 @@ export default function App() {
     clientResponsibles: {}
   });
   const [lastSlaNotification, setLastSlaNotification] = useState<Record<string, number>>({});
+
+  const allClients = React.useMemo(() => {
+    const custom = settings.customClients || [];
+    return Array.from(new Set([...CLIENTS, ...custom])).sort();
+  }, [settings.customClients]);
+
+  const allCategories = React.useMemo(() => {
+    const custom = settings.customCategories || [];
+    return Array.from(new Set([...CATEGORIES, ...custom])).sort();
+  }, [settings.customCategories]);
 
   // Auth initialization
   useEffect(() => {
@@ -139,6 +150,11 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "Total" | "Aguardando">("Total");
+  const [clientFilter, setClientFilter] = useState<ClientName | "Todos">("Todos");
+  const [responsibleFilter, setResponsibleFilter] = useState<string>("Todos");
+  const [categoryFilter, setCategoryFilter] = useState<string>("Todos");
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -146,6 +162,19 @@ export default function App() {
     }
     return false;
   });
+
+  const greeting = React.useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Bom dia";
+    if (hour < 18) return "Boa tarde";
+    return "Boa noite";
+  }, []);
+
+  const formattedDate = new Intl.DateTimeFormat('pt-BR', { 
+    weekday: 'long', 
+    day: 'numeric', 
+    month: 'long' 
+  }).format(new Date());
 
   useEffect(() => {
     if (darkMode) {
@@ -210,18 +239,22 @@ export default function App() {
 
   const handleCreateTicket = async (ticketData: Partial<Ticket>) => {
     try {
+      const formattedData = {
+        ...ticketData,
+        title: ticketData.title?.toUpperCase()
+      };
       const res = await fetch("/api/tickets", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${user.token}`
         },
-        body: JSON.stringify(ticketData)
+        body: JSON.stringify(formattedData)
       });
       
       if (res.ok) {
         const { id } = await res.json();
-        const newTicket = { ...ticketData, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updates: [] } as Ticket;
+        const newTicket = { ...formattedData, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updates: [] } as Ticket;
         setTickets(prev => [newTicket, ...prev]);
         await sendWebhook(newTicket, settings, "create");
         setIsModalOpen(false);
@@ -237,20 +270,27 @@ export default function App() {
 
   const handleUpdateTicket = async (ticketId: string, updates: Partial<Ticket>) => {
     try {
+      const formattedUpdates = {
+        ...updates,
+        title: updates.title ? updates.title.toUpperCase() : undefined
+      };
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${user.token}`
         },
-        body: JSON.stringify(updates)
+        body: JSON.stringify(formattedUpdates)
       });
       
       if (res.ok) {
-        setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t));
+        setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, ...formattedUpdates, updatedAt: new Date().toISOString() } : t));
+        if (selectedTicket?.id === ticketId) {
+          setSelectedTicket(prev => prev ? { ...prev, ...formattedUpdates } : null);
+        }
         const updatedTicket = tickets.find(t => t.id === ticketId);
         if (updatedTicket) {
-          await sendWebhook({ ...updatedTicket, ...updates }, settings, "update");
+          await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, "update");
         }
         toast.success("Chamado atualizado!");
       } else {
@@ -291,18 +331,26 @@ export default function App() {
       ? []
       : tickets.filter(t => t.client === activeTab);
 
-  const filteredTickets = statusFilter === "Total"
-    ? ticketsByTab
-    : ticketsByTab.filter(t => {
-        if (statusFilter === "Aguardando") {
-          return t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros";
-        }
-        return t.status === statusFilter;
-      });
+  const filteredTickets = ticketsByTab.filter(t => {
+    const matchesStatus = statusFilter === "Total" 
+      ? true 
+      : statusFilter === "Aguardando" 
+        ? (t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros")
+        : t.status === statusFilter;
+    
+    const matchesClient = clientFilter === "Todos" ? true : t.client === clientFilter;
+    const matchesResponsible = responsibleFilter === "Todos" ? true : t.responsible === responsibleFilter;
+    const matchesCategory = categoryFilter === "Todos" ? true : t.category === categoryFilter;
+    
+    return matchesStatus && matchesClient && matchesResponsible && matchesCategory;
+  });
+
+  const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
 
   const visibleClients = userProfile?.role === "client" && userProfile.associatedClient
     ? [userProfile.associatedClient]
-    : CLIENTS;
+    : allClients;
 
   if (loading) {
     return (
@@ -386,7 +434,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900 ${darkMode ? 'dark' : ''}`}>
+    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900`}>
       <Toaster position="top-right" />
       {/* Sidebar */}
       <AnimatePresence mode="wait">
@@ -401,10 +449,13 @@ export default function App() {
             <div className="h-full flex flex-col p-6">
               <div className="flex items-center justify-between mb-10 px-2">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-100 dark:shadow-none">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 rotate-3 group-hover:rotate-0 transition-transform duration-300">
                     <Layout className="w-6 h-6 text-white" />
                   </div>
-                  <span className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">IT TICKET</span>
+                  <div>
+                    <h1 className="text-xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none">IT TICKET</h1>
+                    <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-1">Manage</p>
+                  </div>
                 </div>
                 <button 
                   onClick={() => setIsSidebarOpen(false)}
@@ -419,10 +470,17 @@ export default function App() {
               <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4 px-3">Principal</p>
               <button 
                 onClick={() => setActiveTab("dashboard")}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "dashboard" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative ${
+                  activeTab === "dashboard" 
+                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25" 
+                    : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                }`}
               >
-                <LayoutDashboard className={`w-5 h-5 ${activeTab === "dashboard" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
+                <LayoutDashboard className={`w-5 h-5 ${activeTab === "dashboard" ? "text-white" : "text-zinc-400 group-hover:text-zinc-600"}`} />
                 <span className="font-bold text-sm">Dashboard</span>
+                {activeTab === "dashboard" && (
+                  <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-6 bg-white rounded-r-full" />
+                )}
               </button>
             </div>
 
@@ -433,10 +491,17 @@ export default function App() {
                   <button 
                     key={client}
                     onClick={() => setActiveTab(client)}
-                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === client ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-300 group relative ${
+                      activeTab === client 
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/25" 
+                        : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                    }`}
                   >
-                    <div className={`w-2 h-2 rounded-full ${activeTab === client ? "bg-blue-600 dark:bg-blue-400" : "bg-zinc-300 dark:bg-zinc-700 group-hover:bg-zinc-400"}`} />
+                    <div className={`w-2 h-2 rounded-full transition-all duration-300 ${activeTab === client ? "bg-white scale-125" : "bg-zinc-300 dark:bg-zinc-700 group-hover:bg-blue-400"}`} />
                     <span className="font-bold text-sm truncate">{client}</span>
+                    {activeTab === client && (
+                      <motion.div layoutId="sidebar-active" className="absolute left-0 w-1 h-6 bg-white rounded-r-full" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -482,27 +547,30 @@ export default function App() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-20 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between px-6 md:px-10 shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="h-24 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between px-6 md:px-10 shrink-0 sticky top-0 z-30">
+          <div className="flex items-center gap-6">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400 border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
-              title={isSidebarOpen ? "Recolher Menu" : "Expandir Menu"}
+              className="p-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400 border border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight">
-              {activeTab === "dashboard" ? "Visão Geral" : activeTab === "reports" ? "Relatórios" : activeTab === "settings" ? "Configurações" : activeTab}
-            </h2>
+            <div className="hidden md:block">
+              <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
+                {greeting}, {userProfile?.displayName?.split(' ')[0]}!
+                <span className="text-blue-600 animate-pulse">.</span>
+              </h2>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{formattedDate}</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
-            <div className="hidden md:flex items-center gap-2 bg-zinc-50 dark:bg-zinc-800 px-4 py-2 rounded-2xl border border-zinc-100 dark:border-zinc-700">
+            <div className="hidden lg:flex items-center gap-3 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-2.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
               <Search className="w-4 h-4 text-zinc-400" />
               <input 
                 type="text" 
                 placeholder="Buscar chamados..." 
-                className="bg-transparent border-none focus:outline-none text-sm font-medium w-40 lg:w-64 dark:text-white"
+                className="bg-transparent border-none focus:outline-none text-sm font-medium w-48 xl:w-64 dark:text-white placeholder:text-zinc-400"
               />
             </div>
 
@@ -541,92 +609,150 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
               />
             ) : activeTab === "reports" ? (
-              <ReportsView tickets={tickets} darkMode={darkMode} />
+              <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />
             ) : (
               <>
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
                   {[
-                    { label: "Total de Tickets", value: ticketsByTab.length, color: "blue", icon: <BarChart3 /> },
-                    { label: "Resolvidos", value: ticketsByTab.filter(t => t.status === "Resolvido").length, color: "green", icon: <CheckCircle2 /> },
-                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle /> },
-                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "yellow", icon: <Clock /> },
-                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon /> },
-                    { label: "Média de Resposta", value: "2.4h", color: "indigo", icon: <Clock /> }
+                    { label: "Total de Chamados", value: ticketsByTab.filter(t => t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
+                    { label: "Resolvidos", value: ticketsByTab.filter(t => t.status === "Resolvido").length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" },
+                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
+                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
+                    { label: "Aguardando", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
+                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired").length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" }
                   ].map((stat, i) => (
                     <motion.button
                       key={stat.label}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.1 }}
+                      transition={{ delay: i * 0.05 }}
                       onClick={() => {
-                        if (stat.label === "Total de Tickets") setStatusFilter("Total");
+                        if (stat.label === "Total de Chamados") setStatusFilter("Total");
                         else if (stat.label === "Resolvidos") setStatusFilter("Resolvido");
                         else if (stat.label === "Em Aberto") setStatusFilter("Aberto");
                         else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
-                        else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
+                        else if (stat.label === "Aguardando") setStatusFilter("Aguardando Cliente");
+                        else if (stat.label === "SLA Crítico") setStatusFilter("Total"); // Could add specific filter
                       }}
-                      className={`p-6 rounded-[1.5rem] border transition-all duration-300 text-left group relative overflow-hidden flex flex-col gap-4 ${
-                        (statusFilter === "Total" && stat.label === "Total de Tickets") ||
+                      className={`p-6 rounded-[2rem] border transition-all duration-500 text-left group relative overflow-hidden flex flex-col justify-between h-40 ${
+                        (statusFilter === "Total" && stat.label === "Total de Chamados") ||
                         (statusFilter === "Resolvido" && stat.label === "Resolvidos") ||
                         (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
                         (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
-                        (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente")
-                          ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-xl shadow-blue-100/50 dark:shadow-none ring-1 ring-blue-500" 
-                          : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm"
+                        (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando")
+                          ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-2xl shadow-blue-500/10 dark:shadow-none ring-1 ring-blue-500/50" 
+                          : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm hover:shadow-md"
                       }`}
                     >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${
+                      <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                      
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 relative z-10 ${
                         stat.color === "blue" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
                         stat.color === "green" ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
                         stat.color === "red" ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
                         stat.color === "yellow" ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400" :
                         stat.color === "purple" ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" :
+                        stat.color === "orange" ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
                         "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
                       }`}>
-                        <div className="w-5 h-5">
+                        <div className="w-6 h-6">
                           {stat.icon}
                         </div>
                       </div>
-                      <div className="space-y-0.5">
-                        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">{stat.value}</p>
-                        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{stat.label}</p>
+
+                      <div className="relative z-10">
+                        <p className="text-4xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none mb-1">{stat.value}</p>
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{stat.label}</p>
                       </div>
                     </motion.button>
                   ))}
                 </div>
 
                 {/* View Controls */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-                  <div className="flex items-center gap-2 p-1.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                    <button 
-                      onClick={() => setViewMode("kanban")}
-                      className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "kanban" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
+                <div className="flex flex-col space-y-6">
+                  <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-zinc-400" />
+                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Filtros:</span>
+                    </div>
+                    
+                    <select 
+                      value={clientFilter}
+                      onChange={(e) => { setClientFilter(e.target.value as any); setCurrentPage(1); }}
+                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                     >
-                      Kanban
-                    </button>
-                    <button 
-                      onClick={() => setViewMode("list")}
-                      className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
+                      <option value="Todos">Todos Clientes</option>
+                      {allClients.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <select 
+                      value={responsibleFilter}
+                      onChange={(e) => { setResponsibleFilter(e.target.value); setCurrentPage(1); }}
+                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                     >
-                      Lista
-                    </button>
+                      <option value="Todos">Todos Responsáveis</option>
+                      {Array.from(new Set(tickets.map(t => t.responsible).filter(Boolean))).sort().map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+
+                    <select 
+                      value={categoryFilter}
+                      onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
+                    >
+                      <option value="Todos">Todas Categorias</option>
+                      {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+
+                    <div className="h-6 w-px bg-zinc-100 dark:bg-zinc-800 mx-2"></div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Exibir:</span>
+                      <select 
+                        value={itemsPerPage}
+                        onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
+                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
+                      >
+                        <option value={15}>15</option>
+                        <option value={50}>50</option>
+                        <option value={100}>100</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <button 
-                    onClick={() => {
-                      setSelectedTicket(null);
-                      setIsModalOpen(true);
-                    }}
-                    className="w-full sm:w-auto bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold py-4 px-8 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-zinc-200 dark:shadow-none flex items-center justify-center gap-3"
-                  >
-                    <Plus className="w-5 h-5" />
-                    Novo Chamado
-                  </button>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+                    <div className="flex items-center gap-2 p-1.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
+                      <button 
+                        onClick={() => setViewMode("kanban")}
+                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "kanban" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
+                      >
+                        Kanban
+                      </button>
+                      <button 
+                        onClick={() => setViewMode("list")}
+                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
+                      >
+                        Lista
+                      </button>
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setSelectedTicket(null);
+                        setIsModalOpen(true);
+                      }}
+                      className="w-full sm:w-auto bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold py-4 px-8 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-zinc-200 dark:shadow-none flex items-center justify-center gap-3"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Novo Chamado
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main View */}
-                <div className="min-h-[600px]">
+                <div className="min-h-[600px] flex flex-col gap-6">
                   {viewMode === "kanban" ? (
                     <KanbanBoard 
                       tickets={filteredTickets} 
@@ -637,13 +763,38 @@ export default function App() {
                       onStatusChange={handleUpdateTicket}
                     />
                   ) : (
-                    <TicketList 
-                      tickets={filteredTickets} 
-                      onTicketClick={(ticket) => {
-                        setSelectedTicket(ticket);
-                        setIsModalOpen(true);
-                      }}
-                    />
+                    <>
+                      <TicketList 
+                        tickets={paginatedTickets} 
+                        onTicketClick={(ticket) => {
+                          setSelectedTicket(ticket);
+                          setIsModalOpen(true);
+                        }}
+                      />
+                      
+                      {/* Pagination Controls */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-4">
+                          <button 
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-5 h-5 rotate-180" />
+                          </button>
+                          <span className="text-sm font-bold text-zinc-500">
+                            Página {currentPage} de {totalPages}
+                          </span>
+                          <button 
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </>
@@ -664,6 +815,8 @@ export default function App() {
             user={userProfile}
             activeClient={activeTab !== "dashboard" && activeTab !== "reports" && activeTab !== "settings" ? activeTab : undefined}
             clientResponsibles={settings.clientResponsibles}
+            allClients={allClients}
+            allCategories={allCategories}
           />
         )}
       </AnimatePresence>

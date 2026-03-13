@@ -15,6 +15,10 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
+  const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
+  const [customCategories, setCustomCategories] = useState<string[]>(settings.customCategories || []);
+  const [newClientName, setNewClientName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
   
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isAddingUser, setIsAddingUser] = useState(false);
@@ -48,6 +52,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
     setWebhookUrl(settings.webhookUrl || "");
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
+    setCustomClients(settings.customClients || []);
+    setCustomCategories(settings.customCategories || []);
   }, [settings]);
 
   const handleSaveGeneral = async () => {
@@ -87,6 +93,44 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
     };
     setClientResponsibles(newResponsibles);
     onUpdateSettings({ clientResponsibles: newResponsibles });
+  };
+
+  const handleAddClient = () => {
+    if (!newClientName.trim()) return;
+    if (CLIENTS.includes(newClientName as any) || customClients.includes(newClientName)) {
+      setMessage({ type: "error", text: "Este cliente já existe." });
+      return;
+    }
+    const newCustom = [...customClients, newClientName.trim()];
+    setCustomClients(newCustom);
+    onUpdateSettings({ customClients: newCustom });
+    setNewClientName("");
+    setMessage({ type: "success", text: `Cliente ${newClientName} adicionado!` });
+  };
+
+  const handleRemoveClient = (client: string) => {
+    if (confirm(`Tem certeza que deseja excluir o cliente ${client}? Isso não excluirá os chamados dele.`)) {
+      const newCustom = customClients.filter(c => c !== client);
+      setCustomClients(newCustom);
+      onUpdateSettings({ customClients: newCustom });
+    }
+  };
+
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return;
+    const newCustom = [...customCategories, newCategoryName.trim()];
+    setCustomCategories(newCustom);
+    onUpdateSettings({ customCategories: newCustom });
+    setNewCategoryName("");
+    setMessage({ type: "success", text: `Categoria ${newCategoryName} adicionada!` });
+  };
+
+  const handleRemoveCategory = (category: string) => {
+    if (confirm(`Tem certeza que deseja excluir a categoria ${category}?`)) {
+      const newCustom = customCategories.filter(c => c !== category);
+      setCustomCategories(newCustom);
+      onUpdateSettings({ customCategories: newCustom });
+    }
   };
 
   const handleCreateUser = async () => {
@@ -227,6 +271,48 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
             </div>
           </div>
 
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Plus className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Gerenciar Categorias</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Adicione ou remova categorias personalizadas para os chamados.</p>
+            
+            <div className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
+                placeholder="Nome da nova categoria..."
+                className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+              />
+              <button
+                onClick={handleAddCategory}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {customCategories.map((cat) => (
+                <span key={cat} className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-3 border border-zinc-200 dark:border-zinc-700">
+                  {cat}
+                  <button onClick={() => handleRemoveCategory(cat)} className="text-zinc-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </span>
+              ))}
+              {customCategories.length === 0 && (
+                <p className="text-sm text-zinc-400 italic">Nenhuma categoria personalizada adicionada.</p>
+              )}
+            </div>
+          </div>
+
           {message && (
             <motion.div 
               initial={{ opacity: 0, x: -10 }}
@@ -243,20 +329,61 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
       )}
 
       {activeTab === "clients" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {CLIENTS.map((client) => (
-            <motion.div 
-              key={client}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{client}</h3>
-                {clientLogos[client] && (
-                  <img src={clientLogos[client]} alt={client} className="w-10 h-10 rounded-lg object-contain bg-zinc-50 dark:bg-zinc-800 p-1" />
-                )}
+        <div className="space-y-8">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-4"
+          >
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Plus className="w-5 h-5" />
               </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Cadastrar Novo Cliente</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Adicione novos clientes ao sistema. Eles aparecerão automaticamente no menu lateral e filtros.</p>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddClient()}
+                placeholder="Nome do novo cliente..."
+                className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+              />
+              <button
+                onClick={handleAddClient}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+            </div>
+          </motion.div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {[...CLIENTS, ...customClients].sort().map((client) => (
+              <motion.div 
+                key={client}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6 relative group"
+              >
+                {customClients.includes(client) && (
+                  <button 
+                    onClick={() => handleRemoveClient(client)}
+                    className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    title="Remover Cliente"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <div className="flex items-center justify-between pr-8">
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{client}</h3>
+                  {clientLogos[client] && (
+                    <img src={clientLogos[client]} alt={client} className="w-10 h-10 rounded-lg object-contain bg-zinc-50 dark:bg-zinc-800 p-1" />
+                  )}
+                </div>
 
               <div className="space-y-3">
                 <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -314,7 +441,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
             </motion.div>
           ))}
         </div>
-      )}
+      </div>
+    )}
 
       {activeTab === "users" && (
         <motion.div 
@@ -387,7 +515,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
                     >
                       <option value="">Selecione um cliente</option>
-                      {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
+                      {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 )}

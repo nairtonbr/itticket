@@ -46,7 +46,8 @@ db.exec(`
     id TEXT PRIMARY KEY,
     webhookUrl TEXT,
     clientLogos TEXT,
-    clientResponsibles TEXT
+    clientResponsibles TEXT,
+    customClients TEXT
   );
 `);
 
@@ -261,19 +262,21 @@ async function startServer() {
     res.json({
       ...settings,
       clientLogos: JSON.parse(settings.clientLogos || "{}"),
-      clientResponsibles: JSON.parse(settings.clientResponsibles || "{}")
+      clientResponsibles: JSON.parse(settings.clientResponsibles || "{}"),
+      customClients: JSON.parse(settings.customClients || "[]")
     });
   });
 
   app.post("/api/settings", authenticateToken, (req, res) => {
     const settings = req.body;
     db.prepare(`
-      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles)
-      VALUES ('global', ?, ?, ?)
+      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles, customClients)
+      VALUES ('global', ?, ?, ?, ?)
     `).run(
       settings.webhookUrl || "",
       JSON.stringify(settings.clientLogos || {}),
-      JSON.stringify(settings.clientResponsibles || {})
+      JSON.stringify(settings.clientResponsibles || {}),
+      JSON.stringify(settings.customClients || [])
     );
     res.json({ message: "Configurações salvas" });
   });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2 } from "lucide-react";
+import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown } from "lucide-react";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen } from "../utils/dateUtils";
@@ -15,14 +15,16 @@ interface TicketModalProps {
   user: any;
   activeClient?: ClientName;
   clientResponsibles?: Record<string, string[]>;
+  allClients?: string[];
+  allCategories?: string[];
 }
 
-export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdate, onDelete, user, activeClient, clientResponsibles }: TicketModalProps) {
+export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdate, onDelete, user, activeClient, clientResponsibles, allClients = [], allCategories = [] }: TicketModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [client, setClient] = useState<ClientName>(activeClient || CLIENTS[0]);
+  const [client, setClient] = useState<ClientName>(activeClient || (allClients[0] || CLIENTS[0]));
   const [status, setStatus] = useState<TicketStatus>("Aberto");
-  const [category, setCategory] = useState<TicketCategory | "">("");
+  const [category, setCategory] = useState<TicketCategory | string>("");
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
@@ -33,38 +35,76 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<"details" | "comments" | "attachments">("details");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastTicketIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (ticket) {
-      setTitle(ticket.title);
-      setDescription(ticket.description || "");
-      setClient(ticket.client);
-      setStatus(ticket.status);
-      setCategory(ticket.category || "");
-      setPriority(ticket.priority || "");
-      setResponsible(ticket.responsible || "");
-      setSla(ticket.sla || "");
-      setTotalHours(ticket.totalHours || 0);
-      setBilledHours(ticket.billedHours || 0);
-      setAttachments(ticket.attachments || []);
-    } else {
-      setTitle("");
-      setDescription("");
-      setClient(user?.role === "client" ? user.associatedClient : (activeClient || CLIENTS[0]));
-      setStatus("Aberto");
-      setCategory("");
-      setPriority("");
-      setResponsible("");
-      setSla("");
-      setTotalHours(0);
-      setBilledHours(0);
-      setAttachments([]);
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen && !showDeleteConfirm) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onClose, showDeleteConfirm]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      lastTicketIdRef.current = null;
+      return;
     }
-  }, [ticket, activeClient, isOpen]);
+
+    const currentId = ticket?.id || "new";
+    
+    // Only reset state if it's a different ticket or if it's the first time opening
+    if (lastTicketIdRef.current !== currentId) {
+      if (ticket) {
+        setTitle(ticket.title);
+        setDescription(ticket.description || "");
+        setClient(ticket.client);
+        setStatus(ticket.status);
+        setCategory(ticket.category || "");
+        setPriority(ticket.priority || "");
+        setResponsible(ticket.responsible || "");
+        setSla(ticket.sla || "");
+        setTotalHours(ticket.totalHours || 0);
+        setBilledHours(ticket.billedHours || 0);
+        setAttachments(ticket.attachments || []);
+      } else {
+        setTitle("");
+        setDescription("");
+        setClient(user?.role === "client" ? user.associatedClient : (activeClient || (allClients[0] || CLIENTS[0])));
+        setStatus("Aberto");
+        setCategory("");
+        setPriority("");
+        setResponsible("");
+        setSla("");
+        setTotalHours(0);
+        setBilledHours(0);
+        setAttachments([]);
+      }
+      lastTicketIdRef.current = currentId;
+    }
+  }, [ticket, activeClient, isOpen, user, allClients]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Título é obrigatório";
+    if (!client) newErrors.client = "Cliente é obrigatório";
+    if (!category) newErrors.category = "Categoria é obrigatória";
+    if (!status) newErrors.status = "Status é obrigatório";
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      setActiveModalTab("details");
+      return;
+    }
+
+    setErrors({});
     setIsSubmitting(true);
     
     const data = {
@@ -151,6 +191,11 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700`}>
                   {ticket.status}
                 </span>
+                {ticket.category && (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-blue-600 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                    {ticket.category}
+                  </span>
+                )}
                 {ticket.priority && (
                   <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-zinc-500 bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700">
                     {ticket.priority}
@@ -186,16 +231,26 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               <input 
                 type="text" 
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value.toUpperCase());
+                  if (errors.title) setErrors(prev => ({ ...prev, title: "" }));
+                }}
                 placeholder="Título do chamado..."
-                className="w-full text-2xl font-bold text-zinc-900 dark:text-white bg-transparent border-none focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 mb-2"
+                className={`w-full text-2xl font-bold bg-transparent border-none focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 mb-2 uppercase ${
+                  errors.title ? "text-red-500" : "text-zinc-900 dark:text-white"
+                }`}
               />
+              {errors.title && <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">{errors.title}</p>}
               <textarea 
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Adicione uma descrição para este chamado..."
-                rows={2}
-                className="w-full text-sm text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700"
+                className="w-full text-sm text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 min-h-[100px]"
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = target.scrollHeight + 'px';
+                }}
               />
             </div>
 
@@ -235,93 +290,130 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     {/* Left Column */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Clientes:</span>
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Clientes:</span>
                         {user?.role === "client" ? (
-                          <span className="text-sm font-bold text-zinc-900 dark:text-white">{user.associatedClient || client}</span>
+                          <div className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-900 dark:text-white">
+                            {user.associatedClient || client}
+                          </div>
                         ) : (
-                          <select 
-                            value={client}
-                            onChange={(e) => setClient(e.target.value as ClientName)}
-                            className="bg-transparent text-sm font-bold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
-                          >
-                            {CLIENTS.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
+                          <div className="flex-1 relative group">
+                            <select 
+                              value={client}
+                              onChange={(e) => {
+                                setClient(e.target.value as ClientName);
+                                if (errors.client) setErrors(prev => ({ ...prev, client: "" }));
+                              }}
+                              className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                                errors.client ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                              }`}
+                            >
+                              {(allClients.length > 0 ? allClients : CLIENTS).map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                            {errors.client && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.client}</p>}
+                          </div>
                         )}
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Categoria:</span>
-                        <select 
-                          value={category}
-                          onChange={(e) => setCategory(e.target.value as TicketCategory)}
-                          className="bg-transparent text-sm font-bold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
-                        >
-                          <option value="">Selecione</option>
-                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Categoria:</span>
+                        <div className="flex-1 relative group">
+                          <select 
+                            value={category}
+                            onChange={(e) => {
+                              setCategory(e.target.value);
+                              if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
+                            }}
+                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                              errors.category ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                            }`}
+                          >
+                            <option value="">Selecione</option>
+                            {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                          {errors.category && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.category}</p>}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Abertura:</span>
-                        <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Abertura:</span>
+                        <div className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-xl text-sm font-bold text-zinc-900 dark:text-white">
                           {ticket ? formatFirestoreDate(ticket.createdAt, "dd/MM/yy HH:mm") : "-"}
-                        </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Tempo aberto:</span>
-                        <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Tempo aberto:</span>
+                        <div className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-xl text-sm font-bold text-zinc-900 dark:text-white">
                           {ticket ? getTimeOpen(ticket.createdAt) : "-"}
-                        </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">SLA / Prazo:</span>
-                        <input 
-                          type="text" 
-                          value={sla}
-                          onChange={(e) => setSla(e.target.value)}
-                          placeholder="Ex: 4h, 24h"
-                          className="bg-transparent text-sm font-bold text-zinc-900 dark:text-white focus:outline-none placeholder:text-zinc-300"
-                        />
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">SLA / Prazo:</span>
+                        <div className="flex-1">
+                          <input 
+                            type="text" 
+                            value={sla}
+                            onChange={(e) => setSla(e.target.value)}
+                            placeholder="Ex: 4h, 24h"
+                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600"
+                          />
+                        </div>
                       </div>
                     </div>
 
                     {/* Right Column */}
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Status</label>
-                        <select 
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value as TicketStatus)}
-                          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
-                        >
-                          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Status</label>
+                        <div className="relative group">
+                          <select 
+                            value={status}
+                            onChange={(e) => {
+                              setStatus(e.target.value as TicketStatus);
+                              if (errors.status) setErrors(prev => ({ ...prev, status: "" }));
+                            }}
+                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                              errors.status ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                            }`}
+                          >
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                        </div>
+                        {errors.status && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.status}</p>}
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Prioridade</label>
-                        <select 
-                          value={priority}
-                          onChange={(e) => setPriority(e.target.value as TicketPriority)}
-                          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
-                        >
-                          <option value="">Selecionar...</option>
-                          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Prioridade</label>
+                        <div className="relative group">
+                          <select 
+                            value={priority}
+                            onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all dark:text-white"
+                          >
+                            <option value="">Selecionar...</option>
+                            {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                        </div>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Responsável</label>
-                        <select 
-                          value={responsible}
-                          onChange={(e) => setResponsible(e.target.value)}
-                          className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
-                        >
-                          <option value="">Selecionar...</option>
-                          {(clientResponsibles?.[client] || []).map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Responsável</label>
+                        <div className="relative group">
+                          <select 
+                            value={responsible}
+                            onChange={(e) => setResponsible(e.target.value)}
+                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all dark:text-white"
+                          >
+                            <option value="">Selecionar...</option>
+                            {[...(clientResponsibles?.[client] || [])].sort((a, b) => a.localeCompare(b)).map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -353,22 +445,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           className="bg-transparent text-xl font-black text-zinc-900 dark:text-white w-full focus:outline-none"
                         />
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Seguidores Section */}
-                  <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-2 mb-4">
-                      <UserIcon className="w-4 h-4 text-zinc-400" />
-                      <h3 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Seguidores</h3>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border-2 border-white dark:border-zinc-900">
-                        <UserIcon className="w-4 h-4 text-zinc-400" />
-                      </div>
-                      <button className="w-8 h-8 rounded-full bg-zinc-50 dark:bg-zinc-800 border border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center text-zinc-400 hover:text-blue-500 hover:border-blue-500 transition-all">
-                        <Plus className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
 

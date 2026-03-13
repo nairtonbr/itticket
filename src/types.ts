@@ -1,6 +1,6 @@
-export type ClientName = "Avançar" | "Bixnet" | "Brasilink" | "Iplay" | "Jrnet" | "Meconnect" | "Nexo";
+export type ClientName = string;
 export type TicketStatus = "Aberto" | "Em Andamento" | "Aguardando Cliente" | "Aguardando Terceiros" | "Resolvido";
-export type TicketCategory = "Suporte" | "Vendas" | "Financeiro" | "Engenharia" | "Infraestrutura";
+export type TicketCategory = string;
 export type TicketPriority = "Baixa" | "Média" | "Alta" | "Urgente";
 
 export interface TicketAttachment {
@@ -36,6 +36,8 @@ export interface Ticket {
 
 export interface AppSettings {
   webhookUrl: string;
+  customClients?: string[];
+  customCategories?: string[];
   clientLogos?: Record<string, string>; // ClientName -> Logo URL
   clientResponsibles?: Record<string, string[]>; // ClientName -> Array of names
   ticketCounter?: {

@@ -24,44 +24,6 @@ interface KanbanColumnProps {
 }
 
 function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDragStart }: KanbanColumnProps) {
-  const [visibleCount, setVisibleCount] = useState(15);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const observerTarget = useRef<HTMLDivElement>(null);
-
-  const visibleTickets = useMemo(() => {
-    return tickets.slice(0, visibleCount);
-  }, [tickets, visibleCount]);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && visibleCount < tickets.length && !isLoadingMore) {
-          loadMore();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
-    }
-
-    return () => observer.disconnect();
-  }, [visibleCount, tickets.length, isLoadingMore]);
-
-  const loadMore = () => {
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setVisibleCount((prev) => Math.min(prev + 15, tickets.length));
-      setIsLoadingMore(false);
-    }, 300);
-  };
-
-  // Reset visible count when tickets change
-  useEffect(() => {
-    setVisibleCount(15);
-  }, [tickets.length]);
-
   return (
     <div 
       className="flex-shrink-0 w-72 md:w-80 flex flex-col gap-4"
@@ -78,8 +40,8 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
         </div>
       </div>
 
-      <div className="flex-1 bg-zinc-100/50 dark:bg-zinc-900/50 rounded-2xl p-3 space-y-3 overflow-y-auto border border-zinc-200/50 dark:border-zinc-800/50 min-h-[200px] scrollbar-hide">
-        {visibleTickets.map((ticket) => {
+      <div className="flex-1 bg-zinc-100/30 dark:bg-zinc-900/30 rounded-[2rem] p-4 space-y-4 overflow-y-auto border border-zinc-200/50 dark:border-zinc-800/50 min-h-[400px] custom-scrollbar">
+        {tickets.map((ticket) => {
           const slaStatus = getTicketSlaStatus(ticket);
           const slaProgress = getSlaProgress(ticket);
           const isExpired = slaStatus === "expired";
@@ -92,46 +54,54 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
               draggable
               onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, ticket.id)}
               onClick={() => onTicketClick(ticket)}
-              className={`p-4 rounded-xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-md transition-all group bg-white dark:bg-zinc-900 ${
+              className={`p-5 rounded-2xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white dark:bg-zinc-900 ${
                 isExpired 
-                  ? "border-red-500 ring-1 ring-red-500/50" 
+                  ? "border-red-500/50 ring-1 ring-red-500/20" 
                   : isApproaching 
-                    ? "border-yellow-500" 
-                    : "border-zinc-200 dark:border-zinc-700"
-              } ${STATUS_CARD_COLORS[ticket.status]}`}
+                    ? "border-yellow-500/50" 
+                    : "border-zinc-200 dark:border-zinc-800"
+              }`}
             >
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-2 mb-3">
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">#{ticket.id.substring(0, 8)}</span>
-                  {isExpired && <AlertCircle className="w-3 h-3 text-red-500 animate-pulse" />}
+              <div className="flex justify-between items-start gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-tighter">#{ticket.id.substring(0, 6)}</span>
+                  {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 justify-end">
+                  {ticket.category && (
+                    <div className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-800/50">
+                      {ticket.category}
+                    </div>
+                  )}
                   {ticket.priority && (
-                    <div className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700">
+                    <div className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200 dark:border-zinc-700">
                       {ticket.priority}
                     </div>
                   )}
-                  <div className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white/50 dark:bg-zinc-900/50 whitespace-nowrap`}>
-                    {ticket.client}
-                  </div>
                 </div>
               </div>
               
-              <h4 className="font-medium text-zinc-900 dark:text-white mb-3 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              <h4 className="font-bold text-zinc-900 dark:text-white mb-1 line-clamp-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
                 {ticket.title}
               </h4>
 
-              <div className="flex items-center justify-between mt-auto pt-3 border-t border-zinc-50 dark:border-zinc-700/50">
-                <div className="flex items-center gap-1.5 text-zinc-400 dark:text-zinc-500">
-                  <UserIcon className="w-3.5 h-3.5" />
-                  <span className="text-xs font-medium truncate max-w-[100px]">
-                    {ticket.responsible || "Sem resp."}
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2 mb-4 font-medium">
+                {ticket.description}
+              </p>
+
+              <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-50 dark:border-zinc-800/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700">
+                    <UserIcon className="w-3 h-3 text-zinc-400" />
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 truncate max-w-[80px]">
+                    {ticket.responsible?.split(' ')[0] || "N/A"}
                   </span>
                 </div>
                 
                 <div className="flex items-center gap-1 text-zinc-400 dark:text-zinc-500">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-medium">
+                  <Clock className="w-3 h-3" />
+                  <span className="text-[9px] font-bold uppercase tracking-tighter">
                     {(() => {
                       const date = getFirestoreDate(ticket.createdAt);
                       return date ? formatDistanceToNow(date, { addSuffix: true, locale: ptBR }) : "";
@@ -141,32 +111,25 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
               </div>
 
               {ticket.sla && (
-                <div className="mt-2 flex items-center gap-1.5">
-                  <div className="w-full bg-zinc-100 dark:bg-zinc-700 h-1 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-500 ${
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
+                    <span className={isExpired ? "text-red-500" : "text-zinc-400"}>SLA</span>
+                    <span className={isExpired ? "text-red-500" : "text-blue-600 dark:text-blue-400"}>{ticket.sla}</span>
+                  </div>
+                  <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${slaProgress}%` }}
+                      className={`h-full transition-all duration-1000 ${
                         isExpired ? "bg-red-500" : isApproaching ? "bg-yellow-500" : "bg-blue-500"
                       }`} 
-                      style={{ width: `${slaProgress}%` }} 
                     />
                   </div>
-                  <span className={`text-[10px] font-semibold whitespace-nowrap ${
-                    isExpired ? "text-red-500" : isApproaching ? "text-yellow-500" : "text-blue-600 dark:text-blue-400"
-                  }`}>
-                    {ticket.sla}
-                  </span>
                 </div>
               )}
             </motion.div>
           );
         })}
-
-        {/* Observer Target */}
-        <div ref={observerTarget} className="h-4 flex items-center justify-center">
-          {isLoadingMore && (
-            <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
-          )}
-        </div>
         
         {tickets.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-zinc-400 dark:text-zinc-600 opacity-50">
