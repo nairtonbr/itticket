@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown } from "lucide-react";
+import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History } from "lucide-react";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen } from "../utils/dateUtils";
@@ -31,9 +31,11 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [totalHours, setTotalHours] = useState<number>(0);
   const [billedHours, setBilledHours] = useState<number>(0);
   const [newUpdate, setNewUpdate] = useState("");
+  const [editingCommentIndex, setEditingCommentIndex] = useState<number | null>(null);
+  const [editContent, setEditContent] = useState("");
   const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeModalTab, setActiveModalTab] = useState<"details" | "comments" | "attachments">("details");
+  const [activeModalTab, setActiveModalTab] = useState<"details" | "comments" | "attachments" | "history">("details");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +144,35 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     const updatedUpdates = [...(ticket.updates || []), update];
     await onUpdate(ticket.id, { updates: updatedUpdates });
     setNewUpdate("");
+  };
+
+  const handleEditComment = (index: number, content: string) => {
+    setEditingCommentIndex(index);
+    setEditContent(content);
+  };
+
+  const handleSaveEdit = async (index: number) => {
+    if (!ticket || !editContent.trim()) return;
+    
+    const updatedUpdates = [...(ticket.updates || [])];
+    updatedUpdates[index] = {
+      ...updatedUpdates[index],
+      content: editContent,
+      editedAt: new Date().toISOString()
+    };
+    
+    await onUpdate(ticket.id, { updates: updatedUpdates });
+    setEditingCommentIndex(null);
+    setEditContent("");
+  };
+
+  const handleDeleteComment = async (index: number) => {
+    if (!ticket) return;
+    
+    const updatedUpdates = [...(ticket.updates || [])];
+    updatedUpdates.splice(index, 1);
+    
+    await onUpdate(ticket.id, { updates: updatedUpdates });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,7 +290,8 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               {[
                 { id: "details", label: "Detalhes", icon: <FileText className="w-4 h-4" /> },
                 { id: "comments", label: `Comentários (${ticket?.updates?.length || 0})`, icon: <MessageSquare className="w-4 h-4" /> },
-                { id: "attachments", label: `Anexos (${attachments.length})`, icon: <Paperclip className="w-4 h-4" /> }
+                { id: "attachments", label: `Anexos (${attachments.length})`, icon: <Paperclip className="w-4 h-4" /> },
+                { id: "history", label: "Histórico", icon: <Clock className="w-4 h-4" /> }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -472,20 +504,66 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                 <div className="flex flex-col h-full min-h-[400px]">
                   <div className="flex-1 space-y-4 mb-6">
                     {ticket?.updates?.map((update, i) => (
-                      <div key={i} className="flex gap-4">
+                      <div key={i} className="flex gap-4 group">
                         <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
                           <UserIcon className="w-4 h-4 text-zinc-400" />
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-zinc-900 dark:text-white">{update.author}</span>
-                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                              {formatFirestoreDate(update.timestamp, "dd/MM HH:mm")}
-                            </span>
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-zinc-900 dark:text-white">{update.author}</span>
+                              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                                {formatFirestoreDate(update.timestamp, "dd/MM HH:mm")}
+                                {update.editedAt && " (editado)"}
+                              </span>
+                            </div>
+                            
+                            {(user?.displayName === update.author || user?.email === update.author || user?.role === "admin") && (
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => handleEditComment(i, update.content)}
+                                  className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-400 hover:text-blue-500 transition-colors"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteComment(i)}
+                                  className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-400 hover:text-red-500 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
                           </div>
-                          <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-zinc-100 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300">
-                            {update.content}
-                          </div>
+                          
+                          {editingCommentIndex === i ? (
+                            <div className="space-y-2">
+                              <textarea 
+                                value={editContent}
+                                onChange={(e) => setEditContent(e.target.value)}
+                                className="w-full bg-white dark:bg-zinc-900 border border-blue-500 rounded-xl p-3 text-sm focus:outline-none dark:text-white resize-none"
+                                rows={3}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button 
+                                  onClick={() => setEditingCommentIndex(null)}
+                                  className="px-3 py-1 text-[10px] font-bold text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-all"
+                                >
+                                  Cancelar
+                                </button>
+                                <button 
+                                  onClick={() => handleSaveEdit(i)}
+                                  className="px-3 py-1 text-[10px] font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                                >
+                                  Salvar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl border border-zinc-100 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 whitespace-pre-wrap break-words">
+                              {update.content}
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -512,6 +590,43 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     >
                       <Send className="w-4 h-4" />
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {activeModalTab === "history" && (
+                <div className="space-y-6">
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-px bg-zinc-100 dark:bg-zinc-800" />
+                    <div className="space-y-8 relative">
+                      {ticket?.history?.slice().reverse().map((entry, i) => (
+                        <div key={i} className="flex gap-6 items-start">
+                          <div className="w-8 h-8 rounded-full bg-white dark:bg-zinc-900 border-2 border-blue-500 flex items-center justify-center shrink-0 relative z-10">
+                            <History className="w-4 h-4 text-blue-500" />
+                          </div>
+                          <div className="flex-1 pt-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-black text-zinc-900 dark:text-white">{entry.action}</span>
+                              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                                {formatFirestoreDate(entry.timestamp, "dd/MM/yy HH:mm")}
+                              </span>
+                            </div>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium mb-1">
+                              Realizado por: <span className="text-zinc-700 dark:text-zinc-300 font-bold">{entry.user}</span>
+                            </p>
+                            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
+                              {entry.details}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(!ticket?.history || ticket.history.length === 0) && (
+                        <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                          <History className="w-12 h-12 mb-4 opacity-20" />
+                          <p className="text-sm font-medium italic">Nenhum histórico registrado.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -568,6 +683,43 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {activeModalTab === "history" && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Clock className="w-4 h-4 text-zinc-400" />
+                    <h3 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Histórico de Alterações</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {ticket?.history?.map((entry, i) => (
+                      <div key={i} className="flex gap-4 relative">
+                        {i !== (ticket.history?.length || 0) - 1 && (
+                          <div className="absolute left-4 top-8 bottom-0 w-px bg-zinc-100 dark:bg-zinc-800" />
+                        )}
+                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 z-10">
+                          <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        </div>
+                        <div className="flex-1 pb-6">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-zinc-900 dark:text-white">{entry.action}</span>
+                            <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                              {formatFirestoreDate(entry.timestamp, "dd/MM HH:mm")}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Por: {entry.user}</p>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">{entry.details}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {(!ticket?.history || ticket.history.length === 0) && (
+                      <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                        <Clock className="w-12 h-12 mb-4 opacity-20" />
+                        <p className="text-sm font-medium italic">Nenhum histórico disponível.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

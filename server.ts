@@ -39,7 +39,8 @@ db.exec(`
     createdAt TEXT,
     updatedAt TEXT,
     updates TEXT,
-    attachments TEXT
+    attachments TEXT,
+    history TEXT
   );
 
   CREATE TABLE IF NOT EXISTS settings (
@@ -47,7 +48,15 @@ db.exec(`
     webhookUrl TEXT,
     clientLogos TEXT,
     clientResponsibles TEXT,
-    customClients TEXT
+    customClients TEXT,
+    customCategories TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS schedules (
+    id TEXT PRIMARY KEY,
+    analyst TEXT,
+    date TEXT,
+    shift TEXT
   );
 `);
 
@@ -185,7 +194,8 @@ async function startServer() {
     const parsedTickets = tickets.map((t: any) => ({
       ...t,
       updates: JSON.parse(t.updates || "[]"),
-      attachments: JSON.parse(t.attachments || "[]")
+      attachments: JSON.parse(t.attachments || "[]"),
+      history: JSON.parse(t.history || "[]")
     }));
     
     res.json(parsedTickets);
@@ -194,10 +204,18 @@ async function startServer() {
   app.post("/api/tickets", authenticateToken, (req, res) => {
     const ticket = req.body;
     const id = ticket.id || Math.random().toString(36).substring(2, 15);
+    const now = new Date().toISOString();
     
+    const history = [{
+      action: "Criado",
+      user: ticket.author || "Sistema",
+      timestamp: now,
+      details: "Chamado aberto"
+    }];
+
     db.prepare(`
-      INSERT INTO tickets (id, title, description, client, status, category, responsible, sla, createdAt, updatedAt, updates, attachments)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tickets (id, title, description, client, status, category, responsible, sla, createdAt, updatedAt, updates, attachments, history)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       ticket.title,
@@ -207,10 +225,11 @@ async function startServer() {
       ticket.category || "",
       ticket.responsible || "",
       ticket.sla || "",
-      ticket.createdAt || new Date().toISOString(),
-      ticket.updatedAt || new Date().toISOString(),
+      ticket.createdAt || now,
+      ticket.updatedAt || now,
       JSON.stringify(ticket.updates || []),
-      JSON.stringify(ticket.attachments || [])
+      JSON.stringify(ticket.attachments || []),
+      JSON.stringify(history)
     );
     
     res.status(201).json({ id });
@@ -218,26 +237,54 @@ async function startServer() {
 
   app.put("/api/tickets/:id", authenticateToken, (req, res) => {
     const { id } = req.params;
-    const ticket = req.body;
+    const updates = req.body;
+    const now = new Date().toISOString();
     
-    db.prepare(`
-      UPDATE tickets SET 
-        title = ?, description = ?, client = ?, status = ?, category = ?, 
-        responsible = ?, sla = ?, updatedAt = ?, updates = ?, attachments = ?
-      WHERE id = ?
-    `).run(
-      ticket.title,
-      ticket.description,
-      ticket.client,
-      ticket.status,
-      ticket.category,
-      ticket.responsible,
-      ticket.sla,
-      new Date().toISOString(),
-      JSON.stringify(ticket.updates),
-      JSON.stringify(ticket.attachments),
-      id
-    );
+    // Get current ticket state for history tracking
+    const currentTicket: any = db.prepare("SELECT * FROM tickets WHERE id = ?").get(id);
+    if (!currentTicket) return res.status(404).json({ message: "Ticket não encontrado" });
+
+    const history = JSON.parse(currentTicket.history || "[]");
+    const changes: string[] = [];
+
+    // Build dynamic update query
+    const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'history' && k !== 'author');
+    if (fields.length === 0) return res.json({ message: "Nenhuma alteração enviada" });
+
+    // Track changes for history
+    fields.forEach(field => {
+      let oldValue = currentTicket[field];
+      let newValue = updates[field];
+      
+      // Handle JSON fields
+      if (field === 'updates' || field === 'attachments') {
+        oldValue = JSON.parse(oldValue || "[]").length;
+        newValue = (newValue || []).length;
+        if (oldValue !== newValue) {
+          changes.push(`${field === 'updates' ? 'Comentário' : 'Anexo'} adicionado`);
+        }
+      } else if (oldValue !== newValue) {
+        changes.push(`${field}: ${oldValue} -> ${newValue}`);
+      }
+    });
+
+    if (changes.length > 0) {
+      history.push({
+        action: "Atualizado",
+        user: updates.author || "Sistema",
+        timestamp: now,
+        details: changes.join(", ")
+      });
+    }
+
+    const setClause = fields.map(f => `${f} = ?`).join(", ") + ", updatedAt = ?, history = ?";
+    const values = fields.map(f => {
+      if (f === 'updates' || f === 'attachments') return JSON.stringify(updates[f]);
+      return updates[f];
+    });
+    values.push(now, JSON.stringify(history), id);
+
+    db.prepare(`UPDATE tickets SET ${setClause} WHERE id = ?`).run(...values);
     
     res.json({ message: "Ticket atualizado" });
   });
@@ -263,22 +310,48 @@ async function startServer() {
       ...settings,
       clientLogos: JSON.parse(settings.clientLogos || "{}"),
       clientResponsibles: JSON.parse(settings.clientResponsibles || "{}"),
-      customClients: JSON.parse(settings.customClients || "[]")
+      customClients: JSON.parse(settings.customClients || "[]"),
+      customCategories: JSON.parse(settings.customCategories || "[]")
     });
   });
 
   app.post("/api/settings", authenticateToken, (req, res) => {
     const settings = req.body;
     db.prepare(`
-      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles, customClients)
-      VALUES ('global', ?, ?, ?, ?)
+      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles, customClients, customCategories)
+      VALUES ('global', ?, ?, ?, ?, ?)
     `).run(
       settings.webhookUrl || "",
       JSON.stringify(settings.clientLogos || {}),
       JSON.stringify(settings.clientResponsibles || {}),
-      JSON.stringify(settings.customClients || [])
+      JSON.stringify(settings.customClients || []),
+      JSON.stringify(settings.customCategories || [])
     );
     res.json({ message: "Configurações salvas" });
+  });
+
+  // Schedule Routes
+  app.get("/api/schedules", authenticateToken, (req, res) => {
+    const schedules = db.prepare("SELECT * FROM schedules ORDER BY date ASC").all();
+    res.json(schedules);
+  });
+
+  app.post("/api/schedules", authenticateToken, (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    const { analyst, date, shift } = req.body;
+    const id = Math.random().toString(36).substring(2, 15);
+    
+    db.prepare("INSERT INTO schedules (id, analyst, date, shift) VALUES (?, ?, ?, ?)").run(
+      id, analyst, date, shift
+    );
+    
+    res.status(201).json({ id, analyst, date, shift });
+  });
+
+  app.delete("/api/schedules/:id", authenticateToken, (req: any, res) => {
+    if (req.user.role !== 'admin') return res.sendStatus(403);
+    db.prepare("DELETE FROM schedules WHERE id = ?").run(req.params.id);
+    res.json({ message: "Escala excluída" });
   });
 
   // Vite middleware for development

@@ -21,21 +21,25 @@ import {
   Menu,
   X,
   Lock,
-  Mail
+  Mail,
+  ArrowUpDown,
+  Calendar as CalendarIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "react-hot-toast";
-import KanbanBoard from "./components/KanbanBoard";
 import TicketList from "./components/TicketList";
 import TicketModal from "./components/TicketModal";
 import SettingsView from "./components/SettingsView";
-import ReportsView from "./components/ReportsView";
+import { ReportsView } from "./components/ReportsView";
+import { ScheduleView } from "./components/ScheduleView";
 import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile } from "./types";
 import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
+import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { getFirestoreDate } from "./utils/dateUtils";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ClientName | "dashboard" | "reports" | "settings">("dashboard");
+  const [activeTab, setActiveTab] = useState<ClientName | "dashboard" | "reports" | "settings" | "schedule">("dashboard");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -148,14 +152,16 @@ export default function App() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
-  const [statusFilter, setStatusFilter] = useState<TicketStatus | "Total" | "Aguardando">("Total");
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | "Total" | "Aguardando" | "SLA Crítico">("Total");
   const [clientFilter, setClientFilter] = useState<ClientName | "Todos">("Todos");
   const [responsibleFilter, setResponsibleFilter] = useState<string>("Todos");
   const [categoryFilter, setCategoryFilter] = useState<string>("Todos");
+  const [sortBy, setSortBy] = useState<"createdAt" | "updatedAt" | "priority">("updatedAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [itemsPerPage, setItemsPerPage] = useState<number>(15);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 : true);
+  const [zoom, setZoom] = useState(1);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true';
@@ -254,7 +260,20 @@ export default function App() {
       
       if (res.ok) {
         const { id } = await res.json();
-        const newTicket = { ...formattedData, id, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), updates: [] } as Ticket;
+        const now = new Date().toISOString();
+        const newTicket = { 
+          ...formattedData, 
+          id, 
+          createdAt: now, 
+          updatedAt: now, 
+          updates: [],
+          history: [{
+            action: "Criação",
+            user: userProfile?.displayName || userProfile?.email || "Sistema",
+            timestamp: now,
+            details: "Chamado criado no sistema"
+          }]
+        } as Ticket;
         setTickets(prev => [newTicket, ...prev]);
         await sendWebhook(newTicket, settings, "create");
         setIsModalOpen(false);
@@ -270,23 +289,63 @@ export default function App() {
 
   const handleUpdateTicket = async (ticketId: string, updates: Partial<Ticket>) => {
     try {
-      const formattedUpdates = {
+      const author = userProfile?.displayName || userProfile?.email || "Sistema";
+      const now = new Date().toISOString();
+      
+      const formattedUpdates: any = {
         ...updates,
-        title: updates.title ? updates.title.toUpperCase() : undefined
+        author: author
       };
+      
+      if (updates.title) {
+        formattedUpdates.title = updates.title.toUpperCase();
+      }
+
+      // Find original ticket to track changes
+      const originalTicket = tickets.find(t => t.id === ticketId);
+      const historyEntries: any[] = [];
+
+      if (originalTicket) {
+        const trackableFields: (keyof Ticket)[] = ['status', 'priority', 'responsible', 'category', 'title', 'description'];
+        trackableFields.forEach(field => {
+          if (updates[field] !== undefined && updates[field] !== originalTicket[field]) {
+            historyEntries.push({
+              action: `Alteração de ${field}`,
+              user: author,
+              timestamp: now,
+              details: `De "${originalTicket[field] || 'N/A'}" para "${updates[field]}"`
+            });
+          }
+        });
+      }
+
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
           "Authorization": `Bearer ${user.token}`
         },
-        body: JSON.stringify(formattedUpdates)
+        body: JSON.stringify({
+          ...formattedUpdates,
+          history: [...(originalTicket?.history || []), ...historyEntries]
+        })
       });
       
       if (res.ok) {
-        setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, ...formattedUpdates, updatedAt: new Date().toISOString() } : t));
+        setTickets(prev => prev.map(t => t.id === ticketId ? { 
+          ...t, 
+          ...formattedUpdates, 
+          updatedAt: now,
+          history: [...(t.history || []), ...historyEntries]
+        } : t));
+        
         if (selectedTicket?.id === ticketId) {
-          setSelectedTicket(prev => prev ? { ...prev, ...formattedUpdates } : null);
+          setSelectedTicket(prev => prev ? { 
+            ...prev, 
+            ...formattedUpdates, 
+            updatedAt: now,
+            history: [...(prev.history || []), ...historyEntries]
+          } : null);
         }
         const updatedTicket = tickets.find(t => t.id === ticketId);
         if (updatedTicket) {
@@ -331,19 +390,46 @@ export default function App() {
       ? []
       : tickets.filter(t => t.client === activeTab);
 
-  const filteredTickets = ticketsByTab.filter(t => {
-    const matchesStatus = statusFilter === "Total" 
-      ? true 
-      : statusFilter === "Aguardando" 
-        ? (t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros")
-        : t.status === statusFilter;
-    
-    const matchesClient = clientFilter === "Todos" ? true : t.client === clientFilter;
-    const matchesResponsible = responsibleFilter === "Todos" ? true : t.responsible === responsibleFilter;
-    const matchesCategory = categoryFilter === "Todos" ? true : t.category === categoryFilter;
-    
-    return matchesStatus && matchesClient && matchesResponsible && matchesCategory;
-  });
+  const filteredTickets = React.useMemo(() => {
+    const filtered = ticketsByTab.filter(t => {
+      const matchesStatus = statusFilter === "Total" 
+        ? true 
+        : statusFilter === "Aguardando" 
+          ? (t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros")
+          : statusFilter === "SLA Crítico"
+            ? (t.status !== "Resolvido" && getTicketSlaStatus(t) === "expired")
+            : t.status === statusFilter;
+      
+      const matchesClient = clientFilter === "Todos" ? true : t.client === clientFilter;
+      const matchesResponsible = responsibleFilter === "Todos" ? true : t.responsible === responsibleFilter;
+      const matchesCategory = categoryFilter === "Todos" ? true : t.category === categoryFilter;
+      
+      if (!matchesStatus || !matchesClient || !matchesResponsible || !matchesCategory) return false;
+
+      // Special filter for Resolvido: only current month in dashboard
+      if (statusFilter === "Resolvido" && activeTab === "dashboard") {
+        const date = getFirestoreDate(t.updatedAt);
+        if (!date || !isWithinInterval(date, { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === "priority") {
+        const priorityOrder = { "Urgente": 4, "Alta": 3, "Média": 2, "Baixa": 1 };
+        comparison = (priorityOrder[a.priority || "Baixa"] || 0) - (priorityOrder[b.priority || "Baixa"] || 0);
+      } else {
+        const dateA = new Date(a[sortBy] || 0).getTime();
+        const dateB = new Date(b[sortBy] || 0).getTime();
+        comparison = dateA - dateB;
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [ticketsByTab, statusFilter, clientFilter, responsibleFilter, categoryFilter, sortBy, sortOrder, activeTab]);
 
   const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
@@ -510,27 +596,27 @@ export default function App() {
             {(userProfile?.role === "admin" || userProfile?.role === "user") && (
               <div className="pt-6">
                 <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4 px-3">Análise</p>
-                <button 
-                  onClick={() => setActiveTab("reports")}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "reports" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
-                >
-                  <BarChart3 className={`w-5 h-5 ${activeTab === "reports" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
-                  <span className="font-bold text-sm">Relatórios</span>
-                </button>
+                <div className="space-y-1">
+                  <button 
+                    onClick={() => setActiveTab("reports")}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "reports" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
+                  >
+                    <BarChart3 className={`w-5 h-5 ${activeTab === "reports" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
+                    <span className="font-bold text-sm">Relatórios</span>
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab("schedule")}
+                    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "schedule" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
+                  >
+                    <CalendarIcon className={`w-5 h-5 ${activeTab === "schedule" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
+                    <span className="font-bold text-sm">Escala</span>
+                  </button>
+                </div>
               </div>
             )}
           </nav>
 
           <div className="pt-6 mt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-1">
-            {userProfile?.role === "admin" && (
-              <button 
-                onClick={() => setActiveTab("settings")}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "settings" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
-              >
-                <SettingsIcon className={`w-5 h-5 ${activeTab === "settings" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
-                <span className="font-bold text-sm">Configurações</span>
-              </button>
-            )}
             <button 
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-all duration-200 group"
@@ -565,6 +651,16 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
+            <div className="hidden lg:flex items-center gap-2 bg-zinc-100/50 dark:bg-zinc-800/50 px-3 py-1.5 rounded-xl border border-zinc-200/50 dark:border-zinc-700/50">
+              <button onClick={() => setZoom(prev => Math.max(0.7, prev - 0.1))} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors">
+                <Search className="w-3.5 h-3.5 text-zinc-500" style={{ transform: 'scale(0.8)' }} />
+              </button>
+              <span className="text-[10px] font-black text-zinc-400 w-8 text-center">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom(prev => Math.min(1.3, prev + 0.1))} className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg transition-colors">
+                <Plus className="w-3.5 h-3.5 text-zinc-500" />
+              </button>
+            </div>
+
             <div className="hidden lg:flex items-center gap-3 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-2.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
               <Search className="w-4 h-4 text-zinc-400" />
               <input 
@@ -585,6 +681,23 @@ export default function App() {
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
               </button>
+              
+              {userProfile?.role === "admin" && (
+                <button 
+                  onClick={() => setActiveTab("settings")}
+                  className={`p-2.5 rounded-2xl transition-all ${activeTab === "settings" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
+                >
+                  <SettingsIcon className="w-5 h-5" />
+                </button>
+              )}
+
+              <button 
+                onClick={handleLogout}
+                className="p-2.5 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-2xl transition-all text-red-500"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+
               <div className="h-8 w-px bg-zinc-100 dark:bg-zinc-800 mx-1 hidden md:block"></div>
               <div className="flex items-center gap-3 pl-1">
                 <div className="text-right hidden sm:block">
@@ -600,7 +713,10 @@ export default function App() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 bg-zinc-50/50 dark:bg-zinc-950/50 custom-scrollbar">
+        <div 
+          className="flex-1 overflow-y-auto p-6 md:p-10 bg-zinc-50/50 dark:bg-zinc-950/50 custom-scrollbar transition-all duration-300"
+          style={{ zoom: zoom }}
+        >
           <div className="max-w-full mx-auto space-y-10">
             {activeTab === "settings" ? (
               <SettingsView 
@@ -610,17 +726,26 @@ export default function App() {
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />
+            ) : activeTab === "schedule" ? (
+              <ScheduleView isAdmin={userProfile?.role === "admin"} token={user.token} />
             ) : (
               <>
                 {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6">
+                <div className="flex justify-center">
+                  <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 md:gap-6 w-full max-w-[1600px]">
                   {[
-                    { label: "Total de Chamados", value: ticketsByTab.filter(t => t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
-                    { label: "Resolvidos", value: ticketsByTab.filter(t => t.status === "Resolvido").length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" },
+                    { label: "Total", value: ticketsByTab.length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
                     { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
-                    { label: "Aguardando", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
-                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired").length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" }
+                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
+                    { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros").length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
+                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired").length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" },
+                    { label: "Resolvidos", value: ticketsByTab.filter(t => {
+                      if (t.status !== "Resolvido") return false;
+                      const date = new Date(t.updatedAt || t.createdAt);
+                      const now = new Date();
+                      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+                    }).length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" }
                   ].map((stat, i) => (
                     <motion.button
                       key={stat.label}
@@ -628,19 +753,21 @@ export default function App() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.05 }}
                       onClick={() => {
-                        if (stat.label === "Total de Chamados") setStatusFilter("Total");
+                        if (stat.label === "Total") setStatusFilter("Total");
                         else if (stat.label === "Resolvidos") setStatusFilter("Resolvido");
                         else if (stat.label === "Em Aberto") setStatusFilter("Aberto");
                         else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
-                        else if (stat.label === "Aguardando") setStatusFilter("Aguardando Cliente");
-                        else if (stat.label === "SLA Crítico") setStatusFilter("Total"); // Could add specific filter
+                        else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
+                        else if (stat.label === "Aguardando Terceiros") setStatusFilter("Aguardando Terceiros");
+                        else if (stat.label === "SLA Crítico") setStatusFilter("Total");
                       }}
                       className={`p-6 rounded-[2rem] border transition-all duration-500 text-left group relative overflow-hidden flex flex-col justify-between h-40 ${
-                        (statusFilter === "Total" && stat.label === "Total de Chamados") ||
+                        (statusFilter === "Total" && stat.label === "Total") ||
                         (statusFilter === "Resolvido" && stat.label === "Resolvidos") ||
                         (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
                         (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
-                        (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando")
+                        (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente") ||
+                        (statusFilter === "Aguardando Terceiros" && stat.label === "Aguardando Terceiros")
                           ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-2xl shadow-blue-500/10 dark:shadow-none ring-1 ring-blue-500/50" 
                           : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm hover:shadow-md"
                       }`}
@@ -668,74 +795,81 @@ export default function App() {
                     </motion.button>
                   ))}
                 </div>
+              </div>
 
-                {/* View Controls */}
-                <div className="flex flex-col space-y-6">
-                  <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-zinc-900 p-4 rounded-3xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-zinc-400" />
-                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Filtros:</span>
-                    </div>
-                    
-                    <select 
-                      value={clientFilter}
-                      onChange={(e) => { setClientFilter(e.target.value as any); setCurrentPage(1); }}
-                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
-                    >
-                      <option value="Todos">Todos Clientes</option>
-                      {allClients.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                {/* Filters */}
+                <div className="flex justify-center">
+                  <div className="flex flex-wrap items-center justify-between gap-6 bg-white dark:bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm w-full max-w-[1600px]">
+                    <div className="flex flex-wrap items-center gap-6">
+                      {/* Filters */}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 mr-2">
+                          <Filter className="w-4 h-4 text-zinc-400" />
+                          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Filtros:</span>
+                        </div>
+                        
+                        <select 
+                          value={clientFilter}
+                          onChange={(e) => { setClientFilter(e.target.value as any); setCurrentPage(1); }}
+                          className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        >
+                          <option value="Todos">Todos Clientes</option>
+                          {allClients.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
 
-                    <select 
-                      value={responsibleFilter}
-                      onChange={(e) => { setResponsibleFilter(e.target.value); setCurrentPage(1); }}
-                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
-                    >
-                      <option value="Todos">Todos Responsáveis</option>
-                      {Array.from(new Set(tickets.map(t => t.responsible).filter(Boolean))).sort().map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
+                        <select 
+                          value={responsibleFilter}
+                          onChange={(e) => { setResponsibleFilter(e.target.value); setCurrentPage(1); }}
+                          className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        >
+                          <option value="Todos">Todos Responsáveis</option>
+                          {Array.from(new Set(tickets.map(t => t.responsible).filter(Boolean))).sort().map(r => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
+                        </select>
 
-                    <select 
-                      value={categoryFilter}
-                      onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                      className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
-                    >
-                      <option value="Todos">Todas Categorias</option>
-                      {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                        <select 
+                          value={categoryFilter}
+                          onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
+                          className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                        >
+                          <option value="Todos">Todas Categorias</option>
+                          {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
 
-                    <div className="h-6 w-px bg-zinc-100 dark:bg-zinc-800 mx-2"></div>
+                        <div className="flex items-center gap-2 ml-2">
+                          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Ordenar:</span>
+                          <select 
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value as any)}
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          >
+                            <option value="createdAt">Criação</option>
+                            <option value="updatedAt">Atualização</option>
+                            <option value="priority">Prioridade</option>
+                          </select>
+                          <button 
+                            onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : "asc")}
+                            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors text-zinc-500"
+                            title={sortOrder === "asc" ? "Crescente" : "Decrescente"}
+                          >
+                            <ArrowUpDown className={`w-4 h-4 transition-transform ${sortOrder === "desc" ? "rotate-180" : ""}`} />
+                          </button>
+                        </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Exibir:</span>
-                      <select 
-                        value={itemsPerPage}
-                        onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
-                        className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none"
-                      >
-                        <option value={15}>15</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-                    <div className="flex items-center gap-2 p-1.5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm">
-                      <button 
-                        onClick={() => setViewMode("kanban")}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "kanban" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
-                      >
-                        Kanban
-                      </button>
-                      <button 
-                        onClick={() => setViewMode("list")}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
-                      >
-                        Lista
-                      </button>
+                        <div className="flex items-center gap-2 ml-2">
+                          <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Exibir:</span>
+                          <select 
+                            value={itemsPerPage}
+                            onChange={(e) => { setItemsPerPage(parseInt(e.target.value)); setCurrentPage(1); }}
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                          >
+                            <option value={15}>15</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
 
                     <button 
@@ -743,65 +877,54 @@ export default function App() {
                         setSelectedTicket(null);
                         setIsModalOpen(true);
                       }}
-                      className="w-full sm:w-auto bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold py-4 px-8 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-zinc-200 dark:shadow-none flex items-center justify-center gap-3"
+                      className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold py-3 px-6 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-zinc-200 dark:shadow-none flex items-center justify-center gap-2 text-sm"
                     >
-                      <Plus className="w-5 h-5" />
+                      <Plus className="w-4 h-4" />
                       Novo Chamado
                     </button>
                   </div>
                 </div>
 
                 {/* Main View */}
-                <div className="min-h-[600px] flex flex-col gap-6">
-                  {viewMode === "kanban" ? (
-                    <KanbanBoard 
-                      tickets={filteredTickets} 
+                <div className="flex justify-center w-full">
+                  <div className="min-h-[600px] flex flex-col gap-6 w-full max-w-[1600px]">
+                    <TicketList 
+                      tickets={paginatedTickets} 
                       onTicketClick={(ticket) => {
                         setSelectedTicket(ticket);
                         setIsModalOpen(true);
                       }}
-                      onStatusChange={handleUpdateTicket}
                     />
-                  ) : (
-                    <>
-                      <TicketList 
-                        tickets={paginatedTickets} 
-                        onTicketClick={(ticket) => {
-                          setSelectedTicket(ticket);
-                          setIsModalOpen(true);
-                        }}
-                      />
-                      
-                      {/* Pagination Controls */}
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-2 mt-4">
-                          <button 
-                            disabled={currentPage === 1}
-                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
-                          >
-                            <ChevronRight className="w-5 h-5 rotate-180" />
-                          </button>
-                          <span className="text-sm font-bold text-zinc-500">
-                            Página {currentPage} de {totalPages}
-                          </span>
-                          <button 
-                            disabled={currentPage === totalPages}
-                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
-                          >
-                            <ChevronRight className="w-5 h-5" />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
+                    
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-4">
+                        <button 
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                        >
+                          <ChevronRight className="w-5 h-5 rotate-180" />
+                        </button>
+                        <span className="text-sm font-bold text-zinc-500">
+                          Página {currentPage} de {totalPages}
+                        </span>
+                        <button 
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </>
-            )}
-          </div>
+            </>
+          )}
         </div>
-      </main>
+      </div>
+    </main>
 
       <AnimatePresence>
         {isModalOpen && (

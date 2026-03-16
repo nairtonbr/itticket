@@ -14,6 +14,7 @@ export interface TicketUpdate {
   author: string;
   content: string;
   timestamp: any; // Firestore Timestamp
+  editedAt?: string;
 }
 
 export interface Ticket {
@@ -32,6 +33,12 @@ export interface Ticket {
   updatedAt: any; // Firestore Timestamp
   updates: TicketUpdate[];
   attachments?: TicketAttachment[];
+  history?: {
+    action: string;
+    user: string;
+    timestamp: string;
+    details: string;
+  }[];
 }
 
 export interface AppSettings {
