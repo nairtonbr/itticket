@@ -286,8 +286,8 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
   };
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-3 rounded-[1.25rem] shadow-lg shadow-blue-500/20">
             <BarChart3 className="text-white w-6 h-6" />
@@ -298,7 +298,7 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 p-2 bg-white dark:bg-zinc-900 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm">
           <div className="relative group">
             <select 
               value={selectedClient}
@@ -349,8 +349,8 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
         </div>
       </div>
 
-      <div ref={reportRef} className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div ref={reportRef} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Volume Total" value={filteredTickets.length} icon={<BarChart3 />} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" />
         <StatCard label="Taxa de Resolução" value={`${Math.round((filteredTickets.filter(t => t.status === "Resolvido").length / (filteredTickets.length || 1)) * 100)}%`} icon={<CheckCircle2 />} color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
         <StatCard label="SLA Compliance" value={`${slaCompliance}%`} icon={<ShieldAlert />} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
@@ -361,14 +361,14 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="xl:col-span-2 bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+          className="xl:col-span-2 bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4 text-blue-600" />
               </div>
-              <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Fluxo de Atendimento</h3>
+              <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Fluxo de Atendimento</h3>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
@@ -385,7 +385,7 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
               </div>
             </div>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={timeData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
@@ -439,15 +439,15 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-              <PieChartIcon className="w-5 h-5 text-purple-600" />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+              <PieChartIcon className="w-4 h-4 text-purple-600" />
             </div>
-            <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Status</h3>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Status</h3>
           </div>
-          <div className="h-80 w-full relative">
+          <div className="h-64 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -486,15 +486,15 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-              <Tag className="w-5 h-5 text-amber-600" />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <Tag className="w-4 h-4 text-amber-600" />
             </div>
-            <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Categorias</h3>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Categorias</h3>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={categoryData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
@@ -518,15 +518,15 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
         >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-emerald-600" />
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-emerald-600" />
             </div>
-            <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Top Clientes</h3>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Top Clientes</h3>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={clientData.slice(0, 5)}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
@@ -554,27 +554,27 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white dark:bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+        className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
       >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-zinc-900 dark:text-white uppercase tracking-widest">Relatório de Chamados Encerrados</h3>
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Lista detalhada e métricas de fechamento</p>
+              <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Relatório de Chamados Encerrados</h3>
+              <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Lista detalhada e métricas de fechamento</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700">
-              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Chamados</p>
-              <p className="text-xl font-black text-zinc-900 dark:text-white leading-none">{closedTicketsReport.totalCount}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-700">
+              <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Total Chamados</p>
+              <p className="text-lg font-black text-zinc-900 dark:text-white leading-none">{closedTicketsReport.totalCount}</p>
             </div>
-            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-2xl border border-zinc-100 dark:border-zinc-700">
-              <p className="text-[9px] font-black text-zinc-400 uppercase tracking-widest mb-1">Total Horas</p>
-              <p className="text-xl font-black text-blue-600 dark:text-blue-400 leading-none">{closedTicketsReport.totalHours.toFixed(1)}h</p>
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-700">
+              <p className="text-[8px] font-black text-zinc-400 uppercase tracking-widest mb-0.5">Total Horas</p>
+              <p className="text-lg font-black text-blue-600 dark:text-blue-400 leading-none">{closedTicketsReport.totalHours.toFixed(1)}h</p>
             </div>
           </div>
         </div>
@@ -719,16 +719,16 @@ function StatCard({ label, value, icon, color }: { label: string, value: string 
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col gap-6 group hover:border-blue-500/50 transition-all duration-500"
+      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col gap-4 group hover:border-blue-500/50 transition-all duration-500"
     >
-      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 ${color}`}>
-        <div className="w-6 h-6">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 ${color}`}>
+        <div className="w-5 h-5">
           {icon}
         </div>
       </div>
-      <div className="space-y-1">
-        <p className="text-4xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none">{value}</p>
-        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{label}</p>
+      <div className="space-y-0.5">
+        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none">{value}</p>
+        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{label}</p>
       </div>
     </motion.div>
   );

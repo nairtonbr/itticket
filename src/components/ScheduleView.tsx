@@ -16,7 +16,8 @@ import { ptBR } from "date-fns/locale";
 interface ScheduleEntry {
   id: string;
   analyst: string;
-  date: string; // ISO string
+  date: string; // ISO string (Start Date)
+  endDate?: string; // ISO string (End Date)
   shift: "Manhã" | "Tarde" | "Noite" | "Plantão";
 }
 
@@ -157,7 +158,17 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
             </div>
           ))}
           {calendarDays.map((day, i) => {
-            const daySchedules = schedules.filter(s => isSameDay(new Date(s.date), day));
+            const daySchedules = schedules.filter(s => {
+              const start = new Date(s.date);
+              start.setHours(0, 0, 0, 0);
+              const end = s.endDate ? new Date(s.endDate) : start;
+              end.setHours(23, 59, 59, 999);
+              
+              const checkDay = new Date(day);
+              checkDay.setHours(12, 0, 0, 0); // Check middle of day
+
+              return isWithinInterval(checkDay, { start, end });
+            });
             const isCurrentMonth = isSameMonth(day, monthStart);
             const isToday = isSameDay(day, new Date());
 
@@ -237,7 +248,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Data</label>
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
+                  {newEntry.shift === "Plantão" ? "Data Início" : "Data"}
+                </label>
                 <input 
                   type="date"
                   value={newEntry.date || ""}
@@ -245,6 +258,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold dark:text-white"
                 />
               </div>
+
+              {newEntry.shift === "Plantão" && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Data Fim</label>
+                  <input 
+                    type="date"
+                    value={newEntry.endDate || ""}
+                    onChange={e => setNewEntry(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold dark:text-white"
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Turno</label>

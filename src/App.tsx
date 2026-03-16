@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "react-hot-toast";
+import KanbanBoard from "./components/KanbanBoard";
 import TicketList from "./components/TicketList";
 import TicketModal from "./components/TicketModal";
 import SettingsView from "./components/SettingsView";
@@ -152,6 +153,7 @@ export default function App() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [statusFilter, setStatusFilter] = useState<TicketStatus | "Total" | "Aguardando" | "SLA Crítico">("Total");
   const [clientFilter, setClientFilter] = useState<ClientName | "Todos">("Todos");
   const [responsibleFilter, setResponsibleFilter] = useState<string>("Todos");
@@ -797,10 +799,28 @@ export default function App() {
                 </div>
               </div>
 
-                {/* Filters */}
+                {/* View Controls & Filters */}
                 <div className="flex justify-center">
                   <div className="flex flex-wrap items-center justify-between gap-6 bg-white dark:bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm w-full max-w-[1600px]">
                     <div className="flex flex-wrap items-center gap-6">
+                      {/* View Toggle */}
+                      <div className="flex items-center gap-1 p-1 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700">
+                        <button 
+                          onClick={() => setViewMode("kanban")}
+                          className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === "kanban" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"}`}
+                        >
+                          Kanban
+                        </button>
+                        <button 
+                          onClick={() => setViewMode("list")}
+                          className={`px-5 py-2 rounded-xl text-xs font-bold transition-all ${viewMode === "list" ? "bg-blue-600 text-white shadow-lg shadow-blue-200 dark:shadow-none" : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"}`}
+                        >
+                          Lista
+                        </button>
+                      </div>
+
+                      <div className="h-8 w-px bg-zinc-100 dark:bg-zinc-800 hidden md:block"></div>
+
                       {/* Filters */}
                       <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2 mr-2">
@@ -888,38 +908,51 @@ export default function App() {
                 {/* Main View */}
                 <div className="flex justify-center w-full">
                   <div className="min-h-[600px] flex flex-col gap-6 w-full max-w-[1600px]">
-                    <TicketList 
-                      tickets={paginatedTickets} 
+                    {viewMode === "kanban" ? (
+                    <KanbanBoard 
+                      tickets={filteredTickets} 
                       onTicketClick={(ticket) => {
                         setSelectedTicket(ticket);
                         setIsModalOpen(true);
                       }}
+                      onStatusChange={handleUpdateTicket}
                     />
-                    
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 mt-4">
-                        <button 
-                          disabled={currentPage === 1}
-                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                          className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
-                        >
-                          <ChevronRight className="w-5 h-5 rotate-180" />
-                        </button>
-                        <span className="text-sm font-bold text-zinc-500">
-                          Página {currentPage} de {totalPages}
-                        </span>
-                        <button 
-                          disabled={currentPage === totalPages}
-                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                          className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <>
+                      <TicketList 
+                        tickets={paginatedTickets} 
+                        onTicketClick={(ticket) => {
+                          setSelectedTicket(ticket);
+                          setIsModalOpen(true);
+                        }}
+                      />
+                      
+                      {/* Pagination Controls */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-2 mt-4">
+                          <button 
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-5 h-5 rotate-180" />
+                          </button>
+                          <span className="text-sm font-bold text-zinc-500">
+                            Página {currentPage} de {totalPages}
+                          </span>
+                          <button 
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
+              </div>
             </>
           )}
         </div>

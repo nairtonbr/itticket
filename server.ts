@@ -56,6 +56,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     analyst TEXT,
     date TEXT,
+    endDate TEXT,
     shift TEXT
   );
 `);
@@ -338,14 +339,14 @@ async function startServer() {
 
   app.post("/api/schedules", authenticateToken, (req: any, res) => {
     if (req.user.role !== 'admin') return res.sendStatus(403);
-    const { analyst, date, shift } = req.body;
+    const { analyst, date, endDate, shift } = req.body;
     const id = Math.random().toString(36).substring(2, 15);
     
-    db.prepare("INSERT INTO schedules (id, analyst, date, shift) VALUES (?, ?, ?, ?)").run(
-      id, analyst, date, shift
+    db.prepare("INSERT INTO schedules (id, analyst, date, endDate, shift) VALUES (?, ?, ?, ?, ?)").run(
+      id, analyst, date, endDate || null, shift
     );
     
-    res.status(201).json({ id, analyst, date, shift });
+    res.status(201).json({ id, analyst, date, endDate, shift });
   });
 
   app.delete("/api/schedules/:id", authenticateToken, (req: any, res) => {
