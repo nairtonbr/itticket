@@ -64,7 +64,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
             >
               <div className="flex justify-between items-start gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-tighter">#{ticket.id.substring(0, 6)}</span>
+                  <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-tighter">#{ticket.id}</span>
                   <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                     {ticket.client}
                   </span>

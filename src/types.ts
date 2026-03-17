@@ -52,6 +52,7 @@ export interface AppSettings {
     lastDate: string; // YYYYMMDD
     count: number;
   };
+  nextTicketId?: number;
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";

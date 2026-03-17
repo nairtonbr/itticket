@@ -54,7 +54,8 @@ import {
   getDocs,
   Timestamp,
   addDoc,
-  writeBatch
+  writeBatch,
+  runTransaction
 } from "firebase/firestore";
 import { 
   signInWithEmailAndPassword, 
@@ -484,7 +485,22 @@ export default function App() {
   const handleCreateTicket = async (ticketData: Partial<Ticket>) => {
     try {
       const now = new Date().toISOString();
-      const ticketId = Math.random().toString(36).substring(2, 15);
+      
+      const ticketId = await runTransaction(db, async (transaction) => {
+        const settingsRef = doc(db, "settings", "global");
+        const settingsSnap = await transaction.get(settingsRef);
+        
+        let nextId = 2000;
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data() as AppSettings;
+          if (data.nextTicketId && typeof data.nextTicketId === 'number') {
+            nextId = data.nextTicketId;
+          }
+        }
+        
+        transaction.set(settingsRef, { nextTicketId: nextId + 1 }, { merge: true });
+        return nextId.toString();
+      });
       
       const formattedData = {
         ...ticketData,
@@ -498,7 +514,7 @@ export default function App() {
           action: "Criação",
           user: userProfile?.displayName || userProfile?.email || "Sistema",
           timestamp: now,
-          details: "Chamado criado no sistema"
+          details: `Chamado #${ticketId} criado no sistema`
         }]
       };
 
@@ -1013,7 +1029,7 @@ export default function App() {
                               )}
                             </div>
                             <p className="text-[10px] text-zinc-400 truncate">
-                              #{ticket.id?.slice(-6)} • {ticket.client}
+                              #{ticket.id} • {ticket.client}
                             </p>
                           </div>
                           <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-blue-500 transition-colors" />

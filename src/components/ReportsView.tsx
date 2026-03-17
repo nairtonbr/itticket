@@ -691,7 +691,7 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
     <tbody className="divide-y divide-zinc-50 dark:divide-zinc-800/50">
       {closedTicketsReport.list.map(ticket => (
         <tr key={ticket.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-          <td className="py-3 px-4 text-[9px] font-black text-zinc-400 tracking-tighter">#{ticket.id.substring(0, 6)}</td>
+          <td className="py-3 px-4 text-[9px] font-black text-zinc-400 tracking-tighter">#{ticket.id}</td>
           <td className="py-3 px-4 text-xs font-bold text-zinc-900 dark:text-zinc-100">{ticket.title}</td>
           <td className="py-3 px-4 text-[9px] font-black text-zinc-500 uppercase">{ticket.client}</td>
           <td className="py-3 px-4">

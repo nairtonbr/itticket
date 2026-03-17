@@ -58,7 +58,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   <div className="w-[120px] px-6 py-4 shrink-0 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-black font-mono text-zinc-400 dark:text-zinc-500 tracking-tighter" title={ticket.id}>
-                        #{ticket.id.substring(0, 6).toUpperCase()}
+                        #{ticket.id}
                       </span>
                       {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />}
                     </div>

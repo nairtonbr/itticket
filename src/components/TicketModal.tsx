@@ -220,7 +220,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
             {ticket && (
               <>
                 <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                  {ticket.id}
+                  #{ticket.id}
                 </span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700`}>
                   {ticket.status}
