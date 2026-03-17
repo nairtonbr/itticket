@@ -269,7 +269,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                   setTitle(e.target.value.toUpperCase());
                   if (errors.title) setErrors(prev => ({ ...prev, title: "" }));
                 }}
-                placeholder="Título do chamado..."
+                placeholder="Título do chamado... *"
                 className={`w-full text-2xl font-bold bg-transparent border rounded-xl px-4 py-2 focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 mb-2 uppercase transition-all ${
                   errors.title ? "border-red-500 text-red-500" : "border-transparent text-zinc-900 dark:text-white"
                 }`}
@@ -325,7 +325,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     {/* Left Column */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Clientes:</span>
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">
+                          Cliente <span className="text-red-500">*</span>:
+                        </span>
                         {user?.role === "client" ? (
                           <div className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-900 dark:text-white">
                             {user.associatedClient || client}
@@ -351,7 +353,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Categoria:</span>
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">
+                          Categoria <span className="text-red-500">*</span>:
+                        </span>
                         <div className="flex-1 relative group">
                           <select 
                             value={category}
@@ -386,7 +390,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                       </div>
 
                       <div className="flex items-center gap-4">
-                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">SLA / Prazo:</span>
+                        <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">
+                          SLA / Prazo <span className="text-red-500">*</span>:
+                        </span>
                         <div className="flex-1">
                           <input 
                             type="text" 
@@ -408,7 +414,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     {/* Right Column */}
                     <div className="space-y-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Status</label>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">
+                          Status <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative group">
                           <select 
                             value={status}
@@ -428,7 +436,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Prioridade</label>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">
+                          Prioridade <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative group">
                           <select 
                             value={priority}
@@ -449,7 +459,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Responsável</label>
+                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">
+                          Responsável <span className="text-red-500">*</span>
+                        </label>
                         <div className="relative group">
                           <select 
                             value={responsible}

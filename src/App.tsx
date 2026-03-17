@@ -93,9 +93,9 @@ export default function App() {
     if (searchQuery.trim().length < 2) return [];
     const lowerQuery = searchQuery.toLowerCase();
     return tickets.filter(t => 
-      t.title?.toLowerCase().includes(lowerQuery) ||
-      t.description?.toLowerCase().includes(lowerQuery) ||
-      t.id?.toLowerCase().includes(lowerQuery)
+      (t.title || "").toLowerCase().includes(lowerQuery) ||
+      (t.description || "").toLowerCase().includes(lowerQuery) ||
+      (t.id || "").toLowerCase().includes(lowerQuery)
     ).slice(0, 8);
   }, [searchQuery, tickets]);
 
@@ -629,7 +629,14 @@ export default function App() {
       const matchesResponsible = responsibleFilter === "Todos" ? true : t.responsible === responsibleFilter;
       const matchesCategory = categoryFilter === "Todos" ? true : t.category === categoryFilter;
       
-      if (!matchesStatus || !matchesClient || !matchesResponsible || !matchesCategory) return false;
+      // Search filter
+      const matchesSearch = searchQuery.trim().length < 2 ? true : (
+        (t.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.id || "").toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      
+      if (!matchesStatus || !matchesClient || !matchesResponsible || !matchesCategory || !matchesSearch) return false;
 
       // Special filter for Resolvido: only current month in dashboard
       if (statusFilter === "Resolvido" && activeTab === "dashboard") {
@@ -654,7 +661,7 @@ export default function App() {
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [ticketsByTab, statusFilter, clientFilter, responsibleFilter, categoryFilter, sortBy, sortOrder, activeTab, showArchived]);
+  }, [ticketsByTab, statusFilter, clientFilter, responsibleFilter, categoryFilter, sortBy, sortOrder, activeTab, showArchived, searchQuery]);
 
   const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
