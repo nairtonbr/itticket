@@ -208,11 +208,14 @@ export default function App() {
             setUserProfile(userDoc.data() as UserProfile);
           } else {
             // If user exists in Auth but not in Firestore (shouldn't happen with normal flow)
+            const adminEmails = ["nairtonbraga00@gmail.com", "noc.itmanage@gmail.com"];
+            const isAdmin = firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase());
+            
             const profile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
-              role: firebaseUser.email === "NairtonBraga00@gmail.com" ? "admin" : "client"
+              role: isAdmin ? "admin" : "pending"
             };
             await setDoc(doc(db, "users", firebaseUser.uid), profile);
             setUser(firebaseUser);
@@ -713,6 +716,34 @@ export default function App() {
               Acesso Restrito à Equipe IT • Use o Google Login se o acesso por e-mail estiver desativado
             </p>
           </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Pending Authorization Screen
+  if (userProfile.role === 'pending' || (userProfile.role === 'client' && !userProfile.associatedClient)) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4">
+        <Toaster position="top-right" />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-white dark:bg-zinc-900 p-12 rounded-[40px] shadow-2xl border border-zinc-100 dark:border-zinc-800 text-center"
+        >
+          <div className="w-24 h-24 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <AlertCircle className="w-12 h-12" />
+          </div>
+          <h2 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter mb-4">Acesso Pendente</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium leading-relaxed mb-10">
+            Seu Usuário ainda não foi liberado ao sistema.
+          </p>
+          <button 
+            onClick={() => auth.signOut()}
+            className="w-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold py-4 rounded-2xl transition-all"
+          >
+            Sair da Conta
+          </button>
         </motion.div>
       </div>
     );

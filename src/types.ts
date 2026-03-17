@@ -54,7 +54,7 @@ export interface AppSettings {
   };
 }
 
-export type UserRole = "admin" | "user" | "client";
+export type UserRole = "admin" | "user" | "client" | "pending";
 
 export interface UserProfile {
   uid: string;
