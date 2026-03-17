@@ -933,8 +933,8 @@ export default function App() {
               <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                 {greeting}, {userProfile?.displayName?.split(' ')[0]}!
                 {isOnDuty && (
-                  <span className="ml-2 px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse shadow-lg shadow-emerald-500/20">
-                    De Plantão
+                  <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
+                    Plantonista
                   </span>
                 )}
                 <span className="text-blue-600 animate-pulse">.</span>

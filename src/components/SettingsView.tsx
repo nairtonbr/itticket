@@ -483,6 +483,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
                     >
                       <option value="">Selecione um cliente</option>
+                      <option value="Todos">Todos</option>
                       {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
@@ -550,6 +551,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                           className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white w-full"
                         >
                           <option value="">Nenhum</option>
+                          <option value="Todos">Todos</option>
                           {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       ) : (
