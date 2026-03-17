@@ -47,26 +47,34 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+    function userExists() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return userExists() && getUserData().role == role;
     }
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "NairtonBraga00@gmail.com" && request.auth.token.email_verified == true));
+        (hasRole('admin') ||
+         request.auth.token.email == "NairtonBraga00@gmail.com");
     }
 
     function isUser() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user';
+      return hasRole('user');
     }
 
     function isClient() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'client';
+      return hasRole('client');
     }
 
     function getAssociatedClient() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.associatedClient;
+      return getUserData().associatedClient;
     }
 
     function isValidEmail(email) {
@@ -82,14 +90,15 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidTicket(data) {
-      return data.keys().hasAll(['title', 'client', 'status', 'createdAt']) &&
+      return data.keys().hasAll(['title', 'client', 'status']) &&
              data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
-             data.client in ['Avançar', 'Bixnet', 'Brasilink', 'Iplay', 'Jrnet', 'Meconnect', 'Nexo'] &&
+             data.client is string && data.client.size() > 0 && data.client.size() <= 100 &&
              data.status in ['Aberto', 'Em Andamento', 'Aguardando Cliente', 'Aguardando Terceiros', 'Resolvido'] &&
-             (!('category' in data) || data.category in ['ENGENHARIA IP', 'INFRAESTRUTURA', 'NOC', 'PROJETOS', 'NÍVEL3']) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
              (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
              (!('updates' in data) || data.updates is list) &&
-             (!('attachments' in data) || data.attachments is list);
+             (!('attachments' in data) || data.attachments is list) &&
+             (!('archived' in data) || data.archived is int);
     }
 
     function isValidUser(data) {
@@ -107,17 +116,17 @@ service cloud.firestore {
     match /users/{userId} {
       // Users can only read their own profile (PII protection)
       // Admins can read all profiles
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
       
       // Creation: Users can create their own profile as 'client' by default
       // Admins can create any profile
       allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ( (isOwner(userId) && request.resource.data.role == 'client') || isAdmin() );
+                    ( (request.auth.uid == userId && request.resource.data.role == 'client') || isAdmin() );
       
       // Update: Users can update their own profile but NOT their role
       // Admins can update anything
       allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
-                    ( (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() );
+                    ( (request.auth.uid == userId && request.resource.data.role == resource.data.role) || isAdmin() );
     }
 
     match /tickets/{ticketId} {
@@ -137,6 +146,14 @@ service cloud.firestore {
     }
 
     match /settings/global {
+      // Read: Any authenticated user
+      allow read: if isAuthenticated();
+      
+      // Write: Only admins
+      allow write: if isAdmin();
+    }
+
+    match /schedules/{scheduleId} {
       // Read: Any authenticated user
       allow read: if isAuthenticated();
       

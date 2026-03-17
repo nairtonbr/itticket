@@ -63,6 +63,19 @@
         "associatedClient": { "type": "string" }
       },
       "required": ["uid", "email"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "A shift schedule for an analyst",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "analyst": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "shift": { "type": "string" }
+      },
+      "required": ["analyst", "date", "shift"]
     }
   },
   "firestore": {
@@ -77,6 +90,10 @@
     "/users/{userId}": {
       "schema": "User",
       "description": "Collection of users"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": "Schedule",
+      "description": "Collection of analyst schedules"
     }
   }
 }

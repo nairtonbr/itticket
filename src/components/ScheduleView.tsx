@@ -23,43 +23,23 @@ interface ScheduleEntry {
 
 interface ScheduleViewProps {
   isAdmin: boolean;
-  token: string;
+  schedules: ScheduleEntry[];
+  onAdd: (entry: any) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   users: any[];
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token, users }) => {
+export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, onAdd, onDelete, users }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newEntry, setNewEntry] = useState<Partial<ScheduleEntry>>({
     shift: "Manhã",
     analyst: ""
   });
-  const [loading, setLoading] = useState(true);
 
   const adminUsers = React.useMemo(() => {
     return users.filter(u => u.role === "admin");
   }, [users]);
-
-  useEffect(() => {
-    fetchSchedules();
-  }, []);
-
-  const fetchSchedules = async () => {
-    try {
-      const res = await fetch("/api/schedules", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSchedules(data);
-      }
-    } catch (error) {
-      console.error("Error fetching schedules:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleAddSchedule = async () => {
     if (!newEntry.analyst || !newEntry.date || !newEntry.shift) return;
@@ -72,46 +52,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token, user
 
     const payload = {
       ...newEntry,
-      date: parseAsLocalISO(newEntry.date),
+      date: parseAsLocalISO(newEntry.date!),
       endDate: newEntry.endDate ? parseAsLocalISO(newEntry.endDate) : undefined
     };
 
-    try {
-      const res = await fetch("/api/schedules", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const saved = await res.json();
-        setSchedules(prev => [...prev, saved]);
-        setIsAdding(false);
-        setNewEntry({ shift: "Manhã", analyst: "" });
-      }
-    } catch (error) {
-      console.error("Error adding schedule:", error);
-    }
+    await onAdd(payload);
+    setIsAdding(false);
+    setNewEntry({ shift: "Manhã", analyst: "" });
   };
 
-  const handleDeleteSchedule = async (id: string) => {
+  const handleDeleteScheduleClick = async (id: string) => {
     if (!confirm("Deseja excluir esta escala?")) return;
-
-    try {
-      const res = await fetch(`/api/schedules/${id}`, {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        setSchedules(prev => prev.filter(s => s.id !== id));
-      }
-    } catch (error) {
-      console.error("Error deleting schedule:", error);
-    }
+    await onDelete(id);
   };
 
   const monthStart = startOfMonth(currentDate);
@@ -228,7 +180,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token, user
 
                       {isAdmin && (
                         <button 
-                          onClick={() => handleDeleteSchedule(s.id)}
+                          onClick={() => handleDeleteScheduleClick(s.id)}
                           className="absolute -top-1 -right-1 p-1 bg-white dark:bg-zinc-800 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
                         >
                           <Trash2 className="w-3 h-3" />

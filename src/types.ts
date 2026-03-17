@@ -33,6 +33,7 @@ export interface Ticket {
   updatedAt: any; // Firestore Timestamp
   updates: TicketUpdate[];
   attachments?: TicketAttachment[];
+  archived?: number; // 0 for active, 1 for archived
   history?: {
     action: string;
     user: string;

@@ -7,10 +7,13 @@ import { CLIENTS } from "../constants";
 interface SettingsViewProps {
   isAdmin: boolean;
   settings: AppSettings;
-  onUpdateSettings: (settings: Partial<AppSettings>) => void;
+  onUpdateSettings: (settings: Partial<AppSettings>) => Promise<void>;
+  users: UserProfile[];
+  onCreateUser: (userData: any) => Promise<void>;
+  onDeleteUser: (uid: string) => Promise<void>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings }: SettingsViewProps) {
+export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onDeleteUser }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
@@ -20,33 +23,11 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
   const [newClientName, setNewClientName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   
-  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [newUser, setNewUser] = useState<Partial<UserProfile & { password?: string }>>({
     role: "user"
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    
-    const fetchUsers = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("/api/users", {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setUsers(data.map((u: any) => ({ ...u, uid: u.id })));
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-    };
-
-    fetchUsers();
-  }, [isAdmin]);
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
@@ -137,31 +118,12 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
     if (!newUser.email || !newUser.password) return;
     
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...newUser,
-          displayName: newUser.displayName || newUser.email.split("@")[0]
-        })
+      await onCreateUser({
+        ...newUser,
+        displayName: newUser.displayName || newUser.email.split("@")[0]
       });
-
-      if (res.ok) {
-        setIsAddingUser(false);
-        setNewUser({ role: "user" });
-        // Refresh users list
-        const usersRes = await fetch("/api/users", {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (usersRes.ok) {
-          const data = await usersRes.json();
-          setUsers(data);
-        }
-      }
+      setIsAddingUser(false);
+      setNewUser({ role: "user" });
     } catch (error) {
       console.error("Error creating user:", error);
     }
@@ -170,14 +132,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings }: Se
   const handleDeleteUser = async (uid: string) => {
     if (confirm("Tem certeza que deseja excluir este usuário?")) {
       try {
-        const token = localStorage.getItem("token");
-        const res = await fetch(`/api/users/${uid}`, {
-          method: "DELETE",
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          setUsers(prev => prev.filter(u => u.uid !== uid));
-        }
+        await onDeleteUser(uid);
       } catch (error) {
         console.error("Error deleting user:", error);
       }

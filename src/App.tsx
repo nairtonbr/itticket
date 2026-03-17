@@ -36,8 +36,34 @@ import { ScheduleView } from "./components/ScheduleView";
 import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile } from "./types";
 import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
-import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { startOfMonth, endOfMonth, isWithinInterval, subDays } from "date-fns";
 import { getFirestoreDate } from "./utils/dateUtils";
+import { db, auth, handleFirestoreError, OperationType } from "./firebase";
+import firebaseConfig from "../firebase-applet-config.json";
+import { 
+  collection, 
+  onSnapshot, 
+  query, 
+  where, 
+  orderBy, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDoc,
+  getDocs,
+  Timestamp,
+  addDoc,
+  writeBatch
+} from "firebase/firestore";
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  getAuth
+} from "firebase/auth";
+import { initializeApp, getApps, getApp } from "firebase/app";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ClientName | "dashboard" | "reports" | "settings" | "schedule">("dashboard");
@@ -85,59 +111,6 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  // Fetch Data
-  useEffect(() => {
-    if (!user || !userProfile) return;
-
-    const fetchData = async () => {
-      try {
-        const headers = { 
-          'Authorization': `Bearer ${user.token}`,
-          'Content-Type': 'application/json'
-        };
-        
-        // Fetch Tickets
-        const ticketsRes = await fetch(`/api/tickets?archived=${showArchived}`, { headers });
-        if (ticketsRes.ok) {
-          const data = await ticketsRes.json();
-          setTickets(data);
-        }
-
-        // Fetch Settings
-        const settingsRes = await fetch("/api/settings", { headers });
-        if (settingsRes.ok) {
-          const data = await settingsRes.json();
-          if (data.webhookUrl !== undefined) setSettings(data);
-        }
-
-        // Fetch Schedules
-        const schedulesRes = await fetch("/api/schedules", { headers });
-        if (schedulesRes.ok) {
-          const data = await schedulesRes.json();
-          setSchedules(data);
-        }
-
-        // Fetch Users if Admin
-        if (userProfile.role === "admin") {
-          const usersRes = await fetch("/api/users", { headers });
-          if (usersRes.ok) {
-            const data = await usersRes.json();
-            setUsers(data);
-          }
-        }
-
-        // Trigger archiving of old tickets
-        fetch("/api/tickets/archive-old", { method: "POST", headers });
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 30000); // Poll every 30s
-    return () => clearInterval(interval);
-  }, [user, userProfile, showArchived]);
-
   // SLA Monitor
   useEffect(() => {
     if (!tickets.length || !settings?.webhookUrl) return;
@@ -173,6 +146,47 @@ export default function App() {
     return () => clearInterval(interval);
   }, [tickets, settings, lastSlaNotification]);
 
+  const handleArchiveOldTickets = async () => {
+    if (userProfile?.role !== "admin") return;
+    
+    try {
+      const thirtyDaysAgo = subDays(new Date(), 30);
+      const q = query(
+        collection(db, "tickets"),
+        where("status", "==", "Resolvido")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      let count = 0;
+
+      querySnapshot.forEach((docSnap) => {
+        const ticket = docSnap.data();
+        // Only archive if not already archived and is old enough
+        if (ticket.archived !== 1) {
+          const updatedAt = getFirestoreDate(ticket.updatedAt);
+          if (updatedAt && updatedAt < thirtyDaysAgo) {
+            batch.update(docSnap.ref, { archived: 1 });
+            count++;
+          }
+        }
+      });
+
+      if (count > 0) {
+        await batch.commit();
+        console.log(`${count} tickets archived.`);
+      }
+    } catch (error) {
+      console.error("Error archiving old tickets:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (userProfile?.role === "admin") {
+      handleArchiveOldTickets();
+    }
+  }, [userProfile]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
@@ -192,6 +206,105 @@ export default function App() {
     }
     return false;
   });
+
+  // Firebase Auth Observer
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser(firebaseUser);
+            setUserProfile(userDoc.data() as UserProfile);
+          } else {
+            // If user exists in Auth but not in Firestore (shouldn't happen with normal flow)
+            const profile: UserProfile = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
+              role: firebaseUser.email === "NairtonBraga00@gmail.com" ? "admin" : "client"
+            };
+            await setDoc(doc(db, "users", firebaseUser.uid), profile);
+            setUser(firebaseUser);
+            setUserProfile(profile);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      } else {
+        setUser(null);
+        setUserProfile(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Real-time Data Fetching (Firestore)
+  useEffect(() => {
+    if (!user || !userProfile) return;
+
+    // Tickets Subscription
+    let ticketsQuery;
+    if (userProfile.role === 'admin' || userProfile.role === 'user') {
+      ticketsQuery = query(
+        collection(db, "tickets"),
+        where("archived", "==", showArchived ? 1 : 0),
+        orderBy("createdAt", "desc")
+      );
+    } else {
+      ticketsQuery = query(
+        collection(db, "tickets"),
+        where("client", "==", userProfile.associatedClient || ""),
+        where("archived", "==", showArchived ? 1 : 0),
+        orderBy("createdAt", "desc")
+      );
+    }
+
+    const unsubTickets = onSnapshot(ticketsQuery, (snapshot) => {
+      const ticketsData = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as Ticket[];
+      setTickets(ticketsData);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, "tickets"));
+
+    // Settings Subscription
+    const unsubSettings = onSnapshot(doc(db, "settings", "global"), (doc) => {
+      if (doc.exists()) {
+        setSettings(doc.data() as AppSettings);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, "settings/global"));
+
+    // Schedules Subscription
+    const unsubSchedules = onSnapshot(query(collection(db, "schedules"), orderBy("date", "asc")), (snapshot) => {
+      const schedulesData = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      }));
+      setSchedules(schedulesData);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, "schedules"));
+
+    // Users Subscription (Admin only)
+    let unsubUsers = () => {};
+    if (userProfile.role === 'admin') {
+      unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+        const usersData = snapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        }));
+        setUsers(usersData);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+    }
+
+    return () => {
+      unsubTickets();
+      unsubSettings();
+      unsubSchedules();
+      unsubUsers();
+    };
+  }, [user, userProfile, showArchived]);
 
   const greeting = React.useMemo(() => {
     const hour = new Date().getHours();
@@ -239,96 +352,105 @@ export default function App() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setLoading(true);
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setUser({ token: data.token });
-        setUserProfile(data.user);
-        if (data.user.role === "client" && data.user.associatedClient) {
-          setActiveTab(data.user.associatedClient);
-        }
-      } else {
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      // Profile will be loaded by the onAuthStateChanged listener
+      toast.success("Login realizado com sucesso!");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setLoginError("E-mail ou senha incorretos.");
+      } else {
+        setLoginError("Erro ao realizar login. Tente novamente.");
       }
-    } catch (error) {
-      setLoginError("Erro ao conectar com o servidor.");
+      setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
-    setUserProfile(null);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      toast.success("Sessão encerrada");
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${user.token}`
-        },
-        body: JSON.stringify({ ...settings, ...updates })
-      });
-      if (res.ok) {
-        setSettings(prev => ({ ...prev, ...updates }));
-      }
+      await setDoc(doc(db, "settings", "global"), { ...settings, ...updates });
+      toast.success("Configurações salvas!");
     } catch (error) {
       console.error("Error updating settings:", error);
+      toast.error("Erro ao salvar configurações.");
+    }
+  };
+
+  const handleCreateUser = async (userData: any) => {
+    const { email, password, ...profile } = userData;
+    try {
+      // Use a secondary app to create the user without logging out the admin
+      const secondaryApp = getApps().find(a => a.name === "Secondary") || initializeApp(firebaseConfig, "Secondary");
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const uid = userCredential.user.uid;
+      
+      await setDoc(doc(db, "users", uid), {
+        ...profile,
+        uid,
+        email,
+        createdAt: new Date().toISOString()
+      });
+      
+      await signOut(secondaryAuth);
+      toast.success("Usuário criado com sucesso!");
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      toast.error(`Erro ao criar usuário: ${error.message}`);
+    }
+  };
+
+  const handleDeleteUser = async (uid: string) => {
+    try {
+      await deleteDoc(doc(db, "users", uid));
+      toast.success("Usuário removido do sistema!");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      toast.error("Erro ao remover usuário");
     }
   };
 
   const handleCreateTicket = async (ticketData: Partial<Ticket>) => {
     try {
+      const now = new Date().toISOString();
+      const ticketId = Math.random().toString(36).substring(2, 15);
+      
       const formattedData = {
         ...ticketData,
-        title: ticketData.title?.toUpperCase()
+        id: ticketId,
+        title: ticketData.title?.toUpperCase(),
+        createdAt: now,
+        updatedAt: now,
+        updates: [],
+        archived: 0,
+        history: [{
+          action: "Criação",
+          user: userProfile?.displayName || userProfile?.email || "Sistema",
+          timestamp: now,
+          details: "Chamado criado no sistema"
+        }]
       };
-      const res = await fetch("/api/tickets", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${user.token}`
-        },
-        body: JSON.stringify(formattedData)
-      });
+
+      await setDoc(doc(db, "tickets", ticketId), formattedData);
       
-      if (res.ok) {
-        const { id } = await res.json();
-        const now = new Date().toISOString();
-        const newTicket = { 
-          ...formattedData, 
-          id, 
-          createdAt: now, 
-          updatedAt: now, 
-          updates: [],
-          history: [{
-            action: "Criação",
-            user: userProfile?.displayName || userProfile?.email || "Sistema",
-            timestamp: now,
-            details: "Chamado criado no sistema"
-          }]
-        } as Ticket;
-        setTickets(prev => [newTicket, ...prev]);
-        await sendWebhook(newTicket, settings, "create");
-        setIsModalOpen(false);
-        toast.success("Chamado criado com sucesso!");
-      } else {
-        toast.error("Erro ao criar chamado.");
-      }
+      await sendWebhook(formattedData as Ticket, settings, "create");
+      setIsModalOpen(false);
+      toast.success("Chamado criado com sucesso!");
     } catch (error) {
       console.error("Error creating ticket:", error);
-      toast.error("Erro de conexão.");
+      toast.error("Erro ao criar chamado.");
     }
   };
 
@@ -339,7 +461,7 @@ export default function App() {
       
       const formattedUpdates: any = {
         ...updates,
-        author: author
+        updatedAt: now
       };
       
       if (updates.title) {
@@ -364,68 +486,60 @@ export default function App() {
         });
       }
 
-      const res = await fetch(`/api/tickets/${ticketId}`, {
-        method: "PUT",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${user.token}`
-        },
-        body: JSON.stringify({
-          ...formattedUpdates,
-          history: [...(originalTicket?.history || []), ...historyEntries]
-        })
+      const finalHistory = [...(originalTicket?.history || []), ...historyEntries];
+      
+      await updateDoc(doc(db, "tickets", ticketId), {
+        ...formattedUpdates,
+        history: finalHistory
       });
       
-      if (res.ok) {
-        setTickets(prev => prev.map(t => t.id === ticketId ? { 
-          ...t, 
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(prev => prev ? { 
+          ...prev, 
           ...formattedUpdates, 
-          updatedAt: now,
-          history: [...(t.history || []), ...historyEntries]
-        } : t));
-        
-        if (selectedTicket?.id === ticketId) {
-          setSelectedTicket(prev => prev ? { 
-            ...prev, 
-            ...formattedUpdates, 
-            updatedAt: now,
-            history: [...(prev.history || []), ...historyEntries]
-          } : null);
-        }
-        const updatedTicket = tickets.find(t => t.id === ticketId);
-        if (updatedTicket) {
-          await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, "update");
-        }
-        toast.success("Chamado atualizado!");
-      } else {
-        toast.error("Erro ao atualizar chamado.");
+          history: finalHistory
+        } : null);
       }
+
+      const updatedTicket = tickets.find(t => t.id === ticketId);
+      if (updatedTicket) {
+        await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, "update");
+      }
+      toast.success("Chamado atualizado!");
     } catch (error) {
       console.error("Error updating ticket:", error);
-      toast.error("Erro de conexão.");
+      toast.error("Erro ao atualizar chamado.");
     }
   };
 
   const handleDeleteTicket = async (ticketId: string) => {
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, {
-        method: "DELETE",
-        headers: { 
-          "Authorization": `Bearer ${user.token}`
-        }
-      });
-      
-      if (res.ok) {
-        setTickets(prev => prev.filter(t => t.id !== ticketId));
-        toast.success("Chamado excluído com sucesso!");
-        setIsModalOpen(false);
-      } else {
-        const data = await res.json();
-        toast.error(data.message || "Erro ao excluir chamado.");
-      }
+      await deleteDoc(doc(db, "tickets", ticketId));
+      toast.success("Chamado excluído com sucesso!");
+      setIsModalOpen(false);
     } catch (error) {
       console.error("Error deleting ticket:", error);
-      toast.error("Erro de conexão.");
+      toast.error("Erro ao excluir chamado.");
+    }
+  };
+
+  const handleCreateSchedule = async (scheduleData: any) => {
+    try {
+      await addDoc(collection(db, "schedules"), scheduleData);
+      toast.success("Escala agendada!");
+    } catch (error) {
+      console.error("Error creating schedule:", error);
+      toast.error("Erro ao agendar escala.");
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "schedules", id));
+      toast.success("Escala removida!");
+    } catch (error) {
+      console.error("Error deleting schedule:", error);
+      toast.error("Erro ao excluir escala.");
     }
   };
 
@@ -773,11 +887,20 @@ export default function App() {
                 isAdmin={userProfile?.role === "admin"} 
                 settings={settings}
                 onUpdateSettings={handleUpdateSettings}
+                users={users}
+                onCreateUser={handleCreateUser}
+                onDeleteUser={handleDeleteUser}
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />
             ) : activeTab === "schedule" ? (
-              <ScheduleView isAdmin={userProfile?.role === "admin"} token={user?.token || ""} users={users} />
+              <ScheduleView 
+                isAdmin={userProfile?.role === "admin"} 
+                schedules={schedules}
+                onAdd={handleCreateSchedule}
+                onDelete={handleDeleteSchedule}
+                users={users} 
+              />
             ) : (
               <>
                 {/* Stats Grid */}
