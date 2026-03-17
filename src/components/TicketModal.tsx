@@ -99,6 +99,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     if (!client) newErrors.client = "Cliente é obrigatório";
     if (!category) newErrors.category = "Categoria é obrigatória";
     if (!status) newErrors.status = "Status é obrigatório";
+    if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
+    if (!priority) newErrors.priority = "Prioridade é obrigatória";
+    if (!responsible) newErrors.responsible = "Responsável é obrigatório";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -267,8 +270,8 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                   if (errors.title) setErrors(prev => ({ ...prev, title: "" }));
                 }}
                 placeholder="Título do chamado..."
-                className={`w-full text-2xl font-bold bg-transparent border-none focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 mb-2 uppercase ${
-                  errors.title ? "text-red-500" : "text-zinc-900 dark:text-white"
+                className={`w-full text-2xl font-bold bg-transparent border rounded-xl px-4 py-2 focus:outline-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 mb-2 uppercase transition-all ${
+                  errors.title ? "border-red-500 text-red-500" : "border-transparent text-zinc-900 dark:text-white"
                 }`}
               />
               {errors.title && <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">{errors.title}</p>}
@@ -388,10 +391,16 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           <input 
                             type="text" 
                             value={sla}
-                            onChange={(e) => setSla(e.target.value)}
+                            onChange={(e) => {
+                              setSla(e.target.value);
+                              if (errors.sla) setErrors(prev => ({ ...prev, sla: "" }));
+                            }}
                             placeholder="Ex: 4h, 24h"
-                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600"
+                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600 ${
+                              errors.sla ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                            }`}
                           />
+                          {errors.sla && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.sla}</p>}
                         </div>
                       </div>
                     </div>
@@ -423,14 +432,20 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={priority}
-                            onChange={(e) => setPriority(e.target.value as TicketPriority)}
-                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all dark:text-white"
+                            onChange={(e) => {
+                              setPriority(e.target.value as TicketPriority);
+                              if (errors.priority) setErrors(prev => ({ ...prev, priority: "" }));
+                            }}
+                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                              errors.priority ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                            }`}
                           >
                             <option value="">Selecionar...</option>
                             {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                           </select>
                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
                         </div>
+                        {errors.priority && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.priority}</p>}
                       </div>
 
                       <div className="space-y-1">
@@ -438,14 +453,20 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={responsible}
-                            onChange={(e) => setResponsible(e.target.value)}
-                            className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all dark:text-white"
+                            onChange={(e) => {
+                              setResponsible(e.target.value);
+                              if (errors.responsible) setErrors(prev => ({ ...prev, responsible: "" }));
+                            }}
+                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                              errors.responsible ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                            }`}
                           >
                             <option value="">Selecionar...</option>
                             {[...(clientResponsibles?.[client] || [])].sort((a, b) => a.localeCompare(b)).map(r => <option key={r} value={r}>{r}</option>)}
                           </select>
                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
                         </div>
+                        {errors.responsible && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.responsible}</p>}
                       </div>
                     </div>
                   </div>
