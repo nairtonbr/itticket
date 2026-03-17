@@ -62,8 +62,7 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (hasRole('admin') ||
-         request.auth.token.email == "NairtonBraga00@gmail.com" ||
-         request.auth.uid == "ya3m6uawarapuj2f472lpq"); 
+         request.auth.token.email == "NairtonBraga00@gmail.com"); 
     }
 
     function isUser() {
