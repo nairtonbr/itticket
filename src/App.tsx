@@ -440,6 +440,16 @@ export default function App() {
     }
   };
 
+  const handleUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
+    try {
+      await setDoc(doc(db, "users", uid), data, { merge: true });
+      toast.success("Usuário atualizado com sucesso!");
+    } catch (error) {
+      console.error("Error updating user:", error);
+      toast.error("Erro ao atualizar usuário");
+    }
+  };
+
   const handleDeleteUser = async (uid: string) => {
     try {
       await deleteDoc(doc(db, "users", uid));
@@ -636,6 +646,7 @@ export default function App() {
   if (!user) {
     return (
       <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4 ${darkMode ? 'dark' : ''}`}>
+        <Toaster position="top-right" />
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -729,8 +740,19 @@ export default function App() {
     );
   }
 
+  if (!userProfile) {
+    return (
+      <div className={`flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950 ${darkMode ? 'dark' : ''}`}>
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   // Pending Authorization Screen
-  if (userProfile.role === 'pending' || (userProfile.role === 'client' && !userProfile.associatedClient)) {
+  const isPending = userProfile.role === 'pending' || !userProfile.role;
+  const isClientWithoutClient = userProfile.role === 'client' && !userProfile.associatedClient;
+
+  if (isPending || isClientWithoutClient) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4">
         <Toaster position="top-right" />
@@ -968,6 +990,7 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
                 users={users}
                 onCreateUser={handleCreateUser}
+                onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
               />
             ) : activeTab === "reports" ? (

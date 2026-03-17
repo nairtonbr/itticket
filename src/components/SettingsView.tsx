@@ -10,10 +10,11 @@ interface SettingsViewProps {
   onUpdateSettings: (settings: Partial<AppSettings>) => Promise<void>;
   users: UserProfile[];
   onCreateUser: (userData: any) => Promise<void>;
+  onUpdateUser: (uid: string, data: Partial<UserProfile>) => Promise<void>;
   onDeleteUser: (uid: string) => Promise<void>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onDeleteUser }: SettingsViewProps) {
+export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
@@ -27,6 +28,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [newUser, setNewUser] = useState<Partial<UserProfile & { password?: string }>>({
     role: "user"
   });
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editData, setEditData] = useState<Partial<UserProfile>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -126,6 +129,16 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
       setNewUser({ role: "user" });
     } catch (error) {
       console.error("Error creating user:", error);
+    }
+  };
+
+  const handleUpdateUser = async (uid: string) => {
+    try {
+      await onUpdateUser(uid, editData);
+      setEditingUser(null);
+      setEditData({});
+    } catch (error) {
+      console.error("Error updating user:", error);
     }
   };
 
@@ -506,27 +519,88 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">{u.email}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1.5 w-fit ${
-                        u.role === "admin" ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
-                        u.role === "user" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
-                        "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                      }`}>
-                        <Shield className="w-3 h-3" />
-                        {u.role}
-                      </span>
+                      {editingUser === u.uid ? (
+                        <select
+                          value={editData.role || u.role}
+                          onChange={(e) => setEditData({ ...editData, role: e.target.value as UserRole })}
+                          className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
+                        >
+                          <option value="admin">Administrador</option>
+                          <option value="user">Usuário (Técnico)</option>
+                          <option value="client">Cliente</option>
+                          <option value="pending">Pendente</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1.5 w-fit ${
+                          u.role === "admin" ? "bg-purple-50 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400" :
+                          u.role === "user" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" :
+                          u.role === "pending" ? "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400" :
+                          "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        }`}>
+                          <Shield className="w-3 h-3" />
+                          {u.role}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">
-                      {u.associatedClient ? (
-                        <div className="flex items-center gap-1.5">
-                          <Globe className="w-3 h-3" />
-                          {u.associatedClient}
-                        </div>
-                      ) : "-"}
+                      {editingUser === u.uid ? (
+                        <select
+                          value={editData.associatedClient || u.associatedClient || ""}
+                          onChange={(e) => setEditData({ ...editData, associatedClient: e.target.value })}
+                          className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white w-full"
+                        >
+                          <option value="">Nenhum</option>
+                          {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      ) : (
+                        u.associatedClient ? (
+                          <div className="flex items-center gap-1.5">
+                            <Globe className="w-3 h-3" />
+                            {u.associatedClient}
+                          </div>
+                        ) : "-"
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleDeleteUser(u.uid)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex justify-end gap-2">
+                        {editingUser === u.uid ? (
+                          <>
+                            <button 
+                              onClick={() => handleUpdateUser(u.uid)}
+                              className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                              title="Salvar"
+                            >
+                              <Save className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => {
+                                setEditingUser(null);
+                                setEditData({});
+                              }}
+                              className="p-2 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                              title="Cancelar"
+                            >
+                              <Plus className="w-4 h-4 rotate-45" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button 
+                              onClick={() => {
+                                setEditingUser(u.uid);
+                                setEditData({ role: u.role, associatedClient: u.associatedClient });
+                              }}
+                              className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
+                              title="Editar"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteUser(u.uid)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors" title="Excluir">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
