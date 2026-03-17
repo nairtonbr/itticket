@@ -368,7 +368,19 @@ export default function App() {
       toast.success("Login com Google realizado!");
     } catch (error: any) {
       console.error("Google login error:", error);
-      setLoginError("Erro ao realizar login com Google.");
+      let message = "Erro ao realizar login com Google.";
+      const errorCode = error.code || "unknown";
+      
+      if (errorCode === 'auth/operation-not-allowed') {
+        message = "O login por Google não está ativado no Firebase Console. Ative-o em Authentication > Sign-in method.";
+      } else if (errorCode === 'auth/popup-blocked') {
+        message = "O pop-up de login foi bloqueado pelo navegador. Por favor, permita pop-ups para este site.";
+      } else if (errorCode === 'auth/unauthorized-domain') {
+        message = "Este domínio não está autorizado no Firebase Console. Adicione '" + window.location.hostname + "' aos domínios autorizados.";
+      } else {
+        message = `Erro (${errorCode}): ${error.message || "Erro desconhecido"}`;
+      }
+      setLoginError(message);
       setLoading(false);
     }
   };
