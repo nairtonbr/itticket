@@ -26,7 +26,7 @@ interface KanbanColumnProps {
 function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDragStart }: KanbanColumnProps) {
   return (
     <div 
-      className="flex-shrink-0 w-72 md:w-80 flex flex-col gap-4"
+      className="flex-1 min-w-[280px] md:min-w-[320px] flex flex-col gap-4"
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, status)}
     >
@@ -168,8 +168,8 @@ export default function KanbanBoard({ tickets, onTicketClick, onStatusChange }: 
   };
 
   return (
-    <div className="flex justify-start xl:justify-center gap-4 md:gap-6 overflow-x-auto pb-6 h-full min-h-[600px] scrollbar-hide w-full">
-      <div className="flex gap-4 md:gap-6 px-4">
+    <div className="flex gap-4 md:gap-6 overflow-x-auto pb-6 h-full min-h-[600px] custom-scrollbar w-full">
+      <div className="flex gap-4 md:gap-6 px-2 w-full">
         {STATUSES.map((status) => (
           <KanbanColumn
             key={status}

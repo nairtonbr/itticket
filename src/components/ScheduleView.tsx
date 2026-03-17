@@ -24,16 +24,22 @@ interface ScheduleEntry {
 interface ScheduleViewProps {
   isAdmin: boolean;
   token: string;
+  users: any[];
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) => {
+export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token, users }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [isAdding, setIsAdding] = useState(false);
   const [newEntry, setNewEntry] = useState<Partial<ScheduleEntry>>({
-    shift: "Manhã"
+    shift: "Manhã",
+    analyst: ""
   });
   const [loading, setLoading] = useState(true);
+
+  const adminUsers = React.useMemo(() => {
+    return users.filter(u => u.role === "admin");
+  }, [users]);
 
   useEffect(() => {
     fetchSchedules();
@@ -58,6 +64,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
   const handleAddSchedule = async () => {
     if (!newEntry.analyst || !newEntry.date || !newEntry.shift) return;
 
+    // Fix date bug: parse YYYY-MM-DD as local date
+    const parseAsLocalISO = (dateStr: string) => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d).toISOString();
+    };
+
+    const payload = {
+      ...newEntry,
+      date: parseAsLocalISO(newEntry.date),
+      endDate: newEntry.endDate ? parseAsLocalISO(newEntry.endDate) : undefined
+    };
+
     try {
       const res = await fetch("/api/schedules", {
         method: "POST",
@@ -65,14 +83,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify(newEntry)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         const saved = await res.json();
         setSchedules(prev => [...prev, saved]);
         setIsAdding(false);
-        setNewEntry({ shift: "Manhã" });
+        setNewEntry({ shift: "Manhã", analyst: "" });
       }
     } catch (error) {
       console.error("Error adding schedule:", error);
@@ -237,14 +255,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, token }) =>
             
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Analista</label>
-                <input 
-                  type="text"
-                  placeholder="Nome do analista"
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Analista (Admin)</label>
+                <select 
                   value={newEntry.analyst || ""}
                   onChange={e => setNewEntry(prev => ({ ...prev, analyst: e.target.value }))}
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold dark:text-white"
-                />
+                >
+                  <option value="">Selecione um analista</option>
+                  {adminUsers.map(u => (
+                    <option key={u.id} value={u.displayName || u.email}>
+                      {u.displayName || u.email}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

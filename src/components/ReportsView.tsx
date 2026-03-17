@@ -43,6 +43,8 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
   const [closedDateStart, setClosedDateStart] = useState("");
   const [closedDateEnd, setClosedDateEnd] = useState("");
   const [closedPredefinedRange, setClosedPredefinedRange] = useState<string>("custom");
+  const [closedPage, setClosedPage] = useState(1);
+  const itemsPerPage = 20;
 
   const slaOptions = useMemo(() => {
     const slas = tickets.map(t => t.sla).filter(Boolean);
@@ -158,13 +160,18 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
     const totalHours = result.reduce((acc, t) => acc + (t.totalHours || 0), 0);
     const billedHours = result.reduce((acc, t) => acc + (t.billedHours || 0), 0);
 
+    const totalPages = Math.ceil(result.length / itemsPerPage);
+    const paginatedList = result.slice((closedPage - 1) * itemsPerPage, closedPage * itemsPerPage);
+
     return {
-      list: result,
+      list: paginatedList,
+      fullList: result,
       totalCount: result.length,
       totalHours,
-      billedHours
+      billedHours,
+      totalPages
     };
-  }, [tickets, closedClientFilter, closedCategoryFilter, closedDateStart, closedDateEnd]);
+  }, [tickets, closedClientFilter, closedCategoryFilter, closedDateStart, closedDateEnd, closedPage]);
 
   const slaCompliance = useMemo(() => {
     const resolved = filteredTickets.filter(t => t.status === "Resolvido");
@@ -708,6 +715,41 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {closedTicketsReport.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-8">
+            <button 
+              onClick={() => setClosedPage(p => Math.max(1, p - 1))}
+              disabled={closedPage === 1}
+              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 transition-all"
+            >
+              <ChevronDown className="w-5 h-5 rotate-90" />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: closedTicketsReport.totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setClosedPage(page)}
+                  className={`w-8 h-8 rounded-xl text-[10px] font-black transition-all ${
+                    closedPage === page 
+                      ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" 
+                      : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button 
+              onClick={() => setClosedPage(p => Math.min(closedTicketsReport.totalPages, p + 1))}
+              disabled={closedPage === closedTicketsReport.totalPages}
+              className="p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 transition-all"
+            >
+              <ChevronDown className="w-5 h-5 -rotate-90" />
+            </button>
+          </div>
+        )}
       </motion.div>
     </div>
   </div>

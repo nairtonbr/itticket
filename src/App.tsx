@@ -53,7 +53,10 @@ export default function App() {
     clientLogos: {},
     clientResponsibles: {}
   });
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [lastSlaNotification, setLastSlaNotification] = useState<Record<string, number>>({});
+  const [showArchived, setShowArchived] = useState(false);
 
   const allClients = React.useMemo(() => {
     const custom = settings.customClients || [];
@@ -84,7 +87,7 @@ export default function App() {
 
   // Fetch Data
   useEffect(() => {
-    if (!user) return;
+    if (!user || !userProfile) return;
 
     const fetchData = async () => {
       try {
@@ -94,7 +97,7 @@ export default function App() {
         };
         
         // Fetch Tickets
-        const ticketsRes = await fetch("/api/tickets", { headers });
+        const ticketsRes = await fetch(`/api/tickets?archived=${showArchived}`, { headers });
         if (ticketsRes.ok) {
           const data = await ticketsRes.json();
           setTickets(data);
@@ -106,6 +109,25 @@ export default function App() {
           const data = await settingsRes.json();
           if (data.webhookUrl !== undefined) setSettings(data);
         }
+
+        // Fetch Schedules
+        const schedulesRes = await fetch("/api/schedules", { headers });
+        if (schedulesRes.ok) {
+          const data = await schedulesRes.json();
+          setSchedules(data);
+        }
+
+        // Fetch Users if Admin
+        if (userProfile.role === "admin") {
+          const usersRes = await fetch("/api/users", { headers });
+          if (usersRes.ok) {
+            const data = await usersRes.json();
+            setUsers(data);
+          }
+        }
+
+        // Trigger archiving of old tickets
+        fetch("/api/tickets/archive-old", { method: "POST", headers });
       } catch (error) {
         console.error("Error fetching data:", error);
       }
@@ -114,7 +136,7 @@ export default function App() {
     fetchData();
     const interval = setInterval(fetchData, 30000); // Poll every 30s
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, userProfile, showArchived]);
 
   // SLA Monitor
   useEffect(() => {
@@ -177,6 +199,27 @@ export default function App() {
     if (hour < 18) return "Boa tarde";
     return "Boa noite";
   }, []);
+
+  const isOnDuty = React.useMemo(() => {
+    if (!userProfile || !schedules.length) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return schedules.some(s => {
+      if (s.analyst !== userProfile.displayName && s.analyst !== userProfile.email) return false;
+      
+      const startDate = new Date(s.date);
+      startDate.setHours(0, 0, 0, 0);
+      
+      if (s.endDate) {
+        const endDate = new Date(s.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        return today >= startDate && today <= endDate;
+      }
+      
+      return today.getTime() === startDate.getTime();
+    });
+  }, [userProfile, schedules]);
 
   const formattedDate = new Intl.DateTimeFormat('pt-BR', { 
     weekday: 'long', 
@@ -646,6 +689,11 @@ export default function App() {
             <div className="hidden md:block">
               <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                 {greeting}, {userProfile?.displayName?.split(' ')[0]}!
+                {isOnDuty && (
+                  <span className="ml-2 px-2 py-0.5 bg-emerald-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse shadow-lg shadow-emerald-500/20">
+                    De Plantão
+                  </span>
+                )}
                 <span className="text-blue-600 animate-pulse">.</span>
               </h2>
               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{formattedDate}</p>
@@ -716,7 +764,7 @@ export default function App() {
 
         {/* Content Area */}
         <div 
-          className="flex-1 overflow-y-auto p-6 md:p-10 bg-zinc-50/50 dark:bg-zinc-950/50 custom-scrollbar transition-all duration-300"
+          className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-zinc-50/50 dark:bg-zinc-950/50 custom-scrollbar transition-all duration-300"
           style={{ zoom: zoom }}
         >
           <div className="max-w-full mx-auto space-y-10">
@@ -729,12 +777,12 @@ export default function App() {
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />
             ) : activeTab === "schedule" ? (
-              <ScheduleView isAdmin={userProfile?.role === "admin"} token={user.token} />
+              <ScheduleView isAdmin={userProfile?.role === "admin"} token={user?.token || ""} users={users} />
             ) : (
               <>
                 {/* Stats Grid */}
                 <div className="flex justify-center">
-                  <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4 md:gap-6 w-full max-w-[1600px]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
                   {[
                     { label: "Total", value: ticketsByTab.length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
                     { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
@@ -801,7 +849,7 @@ export default function App() {
 
                 {/* View Controls & Filters */}
                 <div className="flex justify-center">
-                  <div className="flex flex-wrap items-center justify-between gap-6 bg-white dark:bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm w-full max-w-[1600px]">
+                  <div className="flex flex-wrap items-center justify-between gap-6 bg-white dark:bg-zinc-900 p-4 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm w-full">
                     <div className="flex flex-wrap items-center gap-6">
                       {/* View Toggle */}
                       <div className="flex items-center gap-1 p-1 bg-zinc-50 dark:bg-zinc-800 rounded-2xl border border-zinc-100 dark:border-zinc-700">
@@ -889,6 +937,19 @@ export default function App() {
                             <option value={100}>100</option>
                           </select>
                         </div>
+
+                        <div className="flex items-center gap-2 ml-4">
+                          <button
+                            onClick={() => setShowArchived(!showArchived)}
+                            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                              showArchived 
+                                ? "bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20" 
+                                : "bg-zinc-50 dark:bg-zinc-800 border-zinc-100 dark:border-zinc-700 text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                            }`}
+                          >
+                            {showArchived ? "Ver Ativos" : "Ver Arquivados"}
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -907,7 +968,7 @@ export default function App() {
 
                 {/* Main View */}
                 <div className="flex justify-center w-full">
-                  <div className="min-h-[600px] flex flex-col gap-6 w-full max-w-[1600px]">
+                  <div className="min-h-[600px] flex flex-col gap-6 w-full">
                     {viewMode === "kanban" ? (
                     <KanbanBoard 
                       tickets={filteredTickets} 

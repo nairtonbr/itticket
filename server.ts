@@ -40,7 +40,10 @@ db.exec(`
     updatedAt TEXT,
     updates TEXT,
     attachments TEXT,
-    history TEXT
+    history TEXT,
+    archived INTEGER DEFAULT 0,
+    totalHours REAL DEFAULT 0,
+    billedHours REAL DEFAULT 0
   );
 
   CREATE TABLE IF NOT EXISTS settings (
@@ -60,6 +63,54 @@ db.exec(`
     shift TEXT
   );
 `);
+
+// Migration: Add missing columns if they don't exist
+const tableInfo = db.prepare("PRAGMA table_info(tickets)").all();
+const columns = tableInfo.map((c: any) => c.name);
+
+if (!columns.includes("archived")) {
+  db.exec("ALTER TABLE tickets ADD COLUMN archived INTEGER DEFAULT 0");
+  console.log("Migration: Added archived column to tickets table.");
+}
+if (!columns.includes("totalHours")) {
+  db.exec("ALTER TABLE tickets ADD COLUMN totalHours REAL DEFAULT 0");
+  console.log("Migration: Added totalHours column to tickets table.");
+}
+if (!columns.includes("billedHours")) {
+  db.exec("ALTER TABLE tickets ADD COLUMN billedHours REAL DEFAULT 0");
+  console.log("Migration: Added billedHours column to tickets table.");
+}
+
+// Migration for users table
+const userTableInfo = db.prepare("PRAGMA table_info(users)").all();
+const userColumns = userTableInfo.map((c: any) => c.name);
+
+if (!userColumns.includes("associatedClient")) {
+  db.exec("ALTER TABLE users ADD COLUMN associatedClient TEXT");
+  console.log("Migration: Added associatedClient column to users table.");
+}
+
+// Migration for settings table
+const settingsTableInfo = db.prepare("PRAGMA table_info(settings)").all();
+const settingsColumns = settingsTableInfo.map((c: any) => c.name);
+
+if (!settingsColumns.includes("customClients")) {
+  db.exec("ALTER TABLE settings ADD COLUMN customClients TEXT");
+  console.log("Migration: Added customClients column to settings table.");
+}
+if (!settingsColumns.includes("customCategories")) {
+  db.exec("ALTER TABLE settings ADD COLUMN customCategories TEXT");
+  console.log("Migration: Added customCategories column to settings table.");
+}
+
+// Migration for schedules table
+const schedulesTableInfo = db.prepare("PRAGMA table_info(schedules)").all();
+const schedulesColumns = schedulesTableInfo.map((c: any) => c.name);
+
+if (!schedulesColumns.includes("endDate")) {
+  db.exec("ALTER TABLE schedules ADD COLUMN endDate TEXT");
+  console.log("Migration: Added endDate column to schedules table.");
+}
 
 // Seed default admin if not exists
 const adminEmail = "NairtonBraga00@gmail.com";
@@ -184,11 +235,13 @@ async function startServer() {
   // Ticket Routes
   app.get("/api/tickets", authenticateToken, (req: any, res) => {
     let tickets;
+    const archived = req.query.archived === 'true' ? 1 : 0;
+    
     if (req.user.role === 'admin' || req.user.role === 'user') {
-      tickets = db.prepare("SELECT * FROM tickets ORDER BY createdAt DESC").all();
+      tickets = db.prepare("SELECT * FROM tickets WHERE archived = ? ORDER BY createdAt DESC").all(archived);
     } else {
       const user: any = db.prepare("SELECT associatedClient FROM users WHERE id = ?").get(req.user.id);
-      tickets = db.prepare("SELECT * FROM tickets WHERE client = ? ORDER BY createdAt DESC").all(user.associatedClient);
+      tickets = db.prepare("SELECT * FROM tickets WHERE client = ? AND archived = ? ORDER BY createdAt DESC").all(user.associatedClient, archived);
     }
     
     // Parse JSON strings back to objects
@@ -200,6 +253,23 @@ async function startServer() {
     }));
     
     res.json(parsedTickets);
+  });
+
+  app.post("/api/tickets/archive-old", authenticateToken, (req: any, res) => {
+    if (req.user.role !== 'admin' && req.user.role !== 'user') return res.sendStatus(403);
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const dateStr = sevenDaysAgo.toISOString();
+
+    // Archive tickets that are 'Resolvido' and updatedAt is older than 7 days
+    const result = db.prepare(`
+      UPDATE tickets 
+      SET archived = 1 
+      WHERE status = 'Resolvido' AND updatedAt < ? AND archived = 0
+    `).run(dateStr);
+
+    res.json({ message: `${result.changes} chamados arquivados.` });
   });
 
   app.post("/api/tickets", authenticateToken, (req, res) => {
@@ -215,8 +285,8 @@ async function startServer() {
     }];
 
     db.prepare(`
-      INSERT INTO tickets (id, title, description, client, status, category, responsible, sla, createdAt, updatedAt, updates, attachments, history)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tickets (id, title, description, client, status, category, responsible, sla, createdAt, updatedAt, updates, attachments, history, totalHours, billedHours)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       ticket.title,
@@ -230,7 +300,9 @@ async function startServer() {
       ticket.updatedAt || now,
       JSON.stringify(ticket.updates || []),
       JSON.stringify(ticket.attachments || []),
-      JSON.stringify(history)
+      JSON.stringify(history),
+      ticket.totalHours || 0,
+      ticket.billedHours || 0
     );
     
     res.status(201).json({ id });

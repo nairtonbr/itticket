@@ -61,4 +61,5 @@ export interface UserProfile {
   displayName: string;
   role: UserRole;
   associatedClient?: ClientName;
+  token?: string;
 }
