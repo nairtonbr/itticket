@@ -202,20 +202,28 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
+          const adminEmails = ["nairtonbraga00@gmail.com", "noc.itmanage@gmail.com"];
+          const isHardcodedAdmin = firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase());
+          
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          
           if (userDoc.exists()) {
-            setUser(firebaseUser);
-            setUserProfile(userDoc.data() as UserProfile);
-          } else {
-            // If user exists in Auth but not in Firestore (shouldn't happen with normal flow)
-            const adminEmails = ["nairtonbraga00@gmail.com", "noc.itmanage@gmail.com"];
-            const isAdmin = firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase());
+            let profile = userDoc.data() as UserProfile;
             
+            // Force admin role if email is in the hardcoded list
+            if (isHardcodedAdmin && profile.role !== 'admin') {
+              profile.role = 'admin';
+              await setDoc(doc(db, "users", firebaseUser.uid), { role: 'admin' }, { merge: true });
+            }
+            
+            setUser(firebaseUser);
+            setUserProfile(profile);
+          } else {
             const profile: UserProfile = {
               uid: firebaseUser.uid,
               email: firebaseUser.email || "",
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
-              role: isAdmin ? "admin" : "pending"
+              role: isHardcodedAdmin ? "admin" : "pending"
             };
             await setDoc(doc(db, "users", firebaseUser.uid), profile);
             setUser(firebaseUser);

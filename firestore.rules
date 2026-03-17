@@ -109,7 +109,7 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'email', 'role']) &&
              data.uid == request.auth.uid &&
              isValidEmail(data.email) &&
-             data.role in ['admin', 'user', 'client'] &&
+             data.role in ['admin', 'user', 'client', 'pending'] &&
              (!('associatedClient' in data) || data.associatedClient is string);
     }
 
