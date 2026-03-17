@@ -56,8 +56,22 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  
+  // Check for missing index error
+  if (errorMessage.includes("The query requires an index")) {
+    const indexUrlMatch = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/);
+    const indexUrl = indexUrlMatch ? indexUrlMatch[0] : null;
+    
+    if (indexUrl) {
+      console.error("Firestore Index Error: ", indexUrl);
+      // We can throw a more descriptive error or handle it in the UI
+      throw new Error(`Índice necessário para esta consulta. Por favor, clique no link para criar: ${indexUrl}`);
+    }
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
