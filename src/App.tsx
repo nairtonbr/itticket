@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Layout, 
   Plus, 
@@ -85,6 +85,29 @@ export default function App() {
   const [users, setUsers] = useState<any[]>([]);
   const [lastSlaNotification, setLastSlaNotification] = useState<Record<string, number>>({});
   const [showArchived, setShowArchived] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  const searchResults = useMemo(() => {
+    if (searchQuery.trim().length < 2) return [];
+    const lowerQuery = searchQuery.toLowerCase();
+    return tickets.filter(t => 
+      t.title?.toLowerCase().includes(lowerQuery) ||
+      t.description?.toLowerCase().includes(lowerQuery) ||
+      t.id?.toLowerCase().includes(lowerQuery)
+    ).slice(0, 8);
+  }, [searchQuery, tickets]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const allClients = React.useMemo(() => {
     const custom = settings.customClients || [];
@@ -251,14 +274,12 @@ export default function App() {
     if (userProfile.role === 'admin' || userProfile.role === 'user') {
       ticketsQuery = query(
         collection(db, "tickets"),
-        where("archived", "==", showArchived ? 1 : 0),
         orderBy("createdAt", "desc")
       );
     } else {
       ticketsQuery = query(
         collection(db, "tickets"),
         where("client", "==", userProfile.associatedClient || ""),
-        where("archived", "==", showArchived ? 1 : 0),
         orderBy("createdAt", "desc")
       );
     }
@@ -589,6 +610,13 @@ export default function App() {
 
   const filteredTickets = React.useMemo(() => {
     const filtered = ticketsByTab.filter(t => {
+      // Filter by archived status
+      if (showArchived) {
+        if (!t.archived) return false;
+      } else {
+        if (t.archived) return false;
+      }
+
       const matchesStatus = statusFilter === "Total" 
         ? true 
         : statusFilter === "Aguardando" 
@@ -626,7 +654,7 @@ export default function App() {
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
-  }, [ticketsByTab, statusFilter, clientFilter, responsibleFilter, categoryFilter, sortBy, sortOrder, activeTab]);
+  }, [ticketsByTab, statusFilter, clientFilter, responsibleFilter, categoryFilter, sortBy, sortOrder, activeTab, showArchived]);
 
   const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
@@ -926,13 +954,78 @@ export default function App() {
               </button>
             </div>
 
-            <div className="hidden lg:flex items-center gap-3 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-2.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+            <div className="hidden lg:flex items-center gap-3 bg-zinc-100/50 dark:bg-zinc-800/50 px-4 py-2.5 rounded-2xl border border-zinc-200/50 dark:border-zinc-700/50 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all relative" ref={searchRef}>
               <Search className="w-4 h-4 text-zinc-400" />
               <input 
                 type="text" 
                 placeholder="Buscar chamados..." 
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setIsSearchOpen(true);
+                }}
+                onFocus={() => setIsSearchOpen(true)}
                 className="bg-transparent border-none focus:outline-none text-sm font-medium w-48 xl:w-64 dark:text-white placeholder:text-zinc-400"
               />
+
+              <AnimatePresence>
+                {isSearchOpen && searchResults.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50"
+                  >
+                    <div className="p-2">
+                      {searchResults.map((ticket) => (
+                        <button
+                          key={ticket.id}
+                          onClick={() => {
+                            setSelectedTicket(ticket);
+                            setIsModalOpen(true);
+                            setIsSearchOpen(false);
+                            setSearchQuery("");
+                          }}
+                          className="w-full flex items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl transition-colors text-left group"
+                        >
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${
+                            ticket.status === "Aberto" ? "bg-red-500" :
+                            ticket.status === "Em Andamento" ? "bg-yellow-500" :
+                            ticket.status === "Resolvido" ? "bg-green-500" :
+                            "bg-zinc-400"
+                          }`} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold text-zinc-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
+                                {ticket.title}
+                              </p>
+                              {ticket.archived && (
+                                <span className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-[8px] font-black rounded uppercase tracking-widest border border-zinc-200 dark:border-zinc-700">
+                                  Arquivado
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-zinc-400 truncate">
+                              #{ticket.id?.slice(-6)} • {ticket.client}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-zinc-300 group-hover:text-blue-500 transition-colors" />
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+                {isSearchOpen && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl p-6 text-center z-50"
+                  >
+                    <p className="text-sm text-zinc-500">Nenhum chamado encontrado para "{searchQuery}"</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
