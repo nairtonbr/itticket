@@ -701,7 +701,7 @@ export default function App() {
 
       // Special filter for Resolvido: only current month in dashboard
       if (statusFilter === "Resolvido" && activeTab === "dashboard") {
-        const date = getFirestoreDate(t.updatedAt);
+        const date = getFirestoreDate(t.updatedAt || t.createdAt);
         if (!date || !isWithinInterval(date, { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })) {
           return false;
         }
@@ -1180,15 +1180,16 @@ export default function App() {
                 <div className="flex justify-center">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
                   {[
-                    { label: "Total", value: ticketsByTab.length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
-                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto").length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
-                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento").length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
-                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente").length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
-                    { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros").length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
-                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired").length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" },
+                    { label: "Total", value: ticketsByTab.filter(t => !t.archived).length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
+                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
+                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
+                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
+                    { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros" && !t.archived).length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
+                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired" && !t.archived).length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" },
                     { label: "Resolvidos", value: ticketsByTab.filter(t => {
-                      if (t.status !== "Resolvido") return false;
-                      const date = new Date(t.updatedAt || t.createdAt);
+                      if (t.status !== "Resolvido" || t.archived) return false;
+                      const date = getFirestoreDate(t.updatedAt || t.createdAt);
+                      if (!date) return false;
                       const now = new Date();
                       return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
                     }).length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" }
