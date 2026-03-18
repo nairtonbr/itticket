@@ -99,6 +99,18 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     }
   }, [ticket, activeClient, isOpen, user, allClients]);
 
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [isOpen, onClose]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
