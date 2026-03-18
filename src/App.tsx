@@ -99,6 +99,10 @@ export default function App() {
     ).slice(0, 8);
   }, [searchQuery, tickets]);
 
+  const newTicketsCount = useMemo(() => {
+    return tickets.filter(t => t.status === "Aberto" && !t.archived).length;
+  }, [tickets]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -1105,7 +1109,11 @@ export default function App() {
               </button>
               <button className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400 relative">
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
+                {newTicketsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center px-1">
+                    {newTicketsCount}
+                  </span>
+                )}
               </button>
               
               {userProfile?.role === "admin" && (
@@ -1378,23 +1386,35 @@ export default function App() {
                       
                       {/* Pagination Controls */}
                       {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-2 mt-4">
+                        <div className="flex items-center justify-center gap-4 mt-8 pb-4">
                           <button 
                             disabled={currentPage === 1}
                             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 transition-all"
                           >
-                            <ChevronRight className="w-5 h-5 rotate-180" />
+                            <ChevronRight className="w-4 h-4 rotate-180" />
+                            Anterior
                           </button>
-                          <span className="text-sm font-bold text-zinc-500">
-                            Página {currentPage} de {totalPages}
-                          </span>
+                          
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                              Página
+                            </span>
+                            <span className="w-8 h-8 flex items-center justify-center bg-blue-600 text-white rounded-lg text-xs font-black shadow-lg shadow-blue-500/20">
+                              {currentPage}
+                            </span>
+                            <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                              de {totalPages}
+                            </span>
+                          </div>
+
                           <button 
                             disabled={currentPage === totalPages}
                             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            className="p-2 rounded-xl border border-zinc-100 dark:border-zinc-800 text-zinc-500 disabled:opacity-30"
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 transition-all"
                           >
-                            <ChevronRight className="w-5 h-5" />
+                            Próximo
+                            <ChevronRight className="w-4 h-4" />
                           </button>
                         </div>
                       )}
