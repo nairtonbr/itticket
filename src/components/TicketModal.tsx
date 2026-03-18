@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History } from "lucide-react";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
-import { formatFirestoreDate, getTimeOpen } from "../utils/dateUtils";
+import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
 
 interface TicketModalProps {
   isOpen: boolean;
@@ -29,6 +29,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
   const [totalHours, setTotalHours] = useState<number>(0);
+  const [liveElapsed, setLiveElapsed] = useState(0);
   const [newUpdate, setNewUpdate] = useState("");
   const [editingCommentIndex, setEditingCommentIndex] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -41,14 +42,22 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const lastTicketIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen && !showDeleteConfirm) {
-        onClose();
-      }
+    if (!isOpen || !ticket?.inProgressSince || ticket.status !== "Em Andamento") {
+      setLiveElapsed(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const start = new Date(ticket.inProgressSince!).getTime();
+      const now = new Date().getTime();
+      const elapsed = Math.max(0, (now - start) / (1000 * 60 * 60));
+      setLiveElapsed(elapsed);
     };
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [isOpen, onClose, showDeleteConfirm]);
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 30000); // Update every 30s
+    return () => clearInterval(interval);
+  }, [isOpen, ticket?.inProgressSince, ticket?.status]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -481,26 +490,67 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
 
                   {/* Horas Section */}
                   <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Clock className="w-4 h-4 text-zinc-400" />
-                      <h3 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Horas</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-zinc-400" />
+                        <h3 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Controle de Horas</h3>
+                      </div>
+                      {ticket?.inProgressSince && (
+                        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                            Sessão Atual: {formatHoursToHMin(liveElapsed)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-4">
-                      <div className="flex-1 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-700">
-                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Total Horas</p>
-                        <input 
-                          type="number"
-                          step="0.1"
-                          value={totalHours}
-                          onChange={(e) => setTotalHours(parseFloat(e.target.value) || 0)}
-                          className="bg-transparent text-xl font-black text-zinc-900 dark:text-white w-full focus:outline-none"
-                        />
-                        {ticket?.inProgressSince && (
-                          <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest animate-pulse">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Contabilizando horas automaticamente...
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-700">
+                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-3">Total Acumulado</p>
+                        <div className="flex items-end gap-3">
+                          <div className="flex-1">
+                            <label className="text-[9px] font-bold text-zinc-400 uppercase block mb-1">Horas</label>
+                            <input 
+                              type="number"
+                              min="0"
+                              value={Math.floor(totalHours)}
+                              onChange={(e) => {
+                                const h = parseInt(e.target.value) || 0;
+                                const m = Math.round((totalHours - Math.floor(totalHours)) * 60);
+                                setTotalHours(h + (m / 60));
+                              }}
+                              className="bg-zinc-100 dark:bg-zinc-900 text-xl font-black text-zinc-900 dark:text-white w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            />
                           </div>
-                        )}
+                          <div className="flex-1">
+                            <label className="text-[9px] font-bold text-zinc-400 uppercase block mb-1">Minutos</label>
+                            <input 
+                              type="number"
+                              min="0"
+                              max="59"
+                              value={Math.round((totalHours - Math.floor(totalHours)) * 60)}
+                              onChange={(e) => {
+                                let m = parseInt(e.target.value) || 0;
+                                if (m > 59) m = 59;
+                                const h = Math.floor(totalHours);
+                                setTotalHours(h + (m / 60));
+                              }}
+                              className="bg-zinc-100 dark:bg-zinc-900 text-xl font-black text-zinc-900 dark:text-white w-full px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-blue-600 rounded-2xl border border-blue-500 shadow-lg shadow-blue-500/20 flex flex-col justify-between">
+                        <p className="text-[10px] font-bold text-blue-100 uppercase tracking-widest">Total Geral (Com Sessão)</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-3xl font-black text-white">{formatHoursToHMin(totalHours + liveElapsed).split(' ')[0]}</span>
+                          <span className="text-lg font-black text-blue-200">{formatHoursToHMin(totalHours + liveElapsed).split(' ')[1]}</span>
+                        </div>
+                        <p className="text-[9px] font-bold text-blue-200 uppercase tracking-widest mt-2">
+                          {ticket?.status === "Em Andamento" ? "Incluindo tempo da sessão atual" : "Tempo total registrado"}
+                        </p>
                       </div>
                     </div>
                   </div>

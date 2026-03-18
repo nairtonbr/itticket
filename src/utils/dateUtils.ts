@@ -52,3 +52,14 @@ export const getTimeOpen = (date: any): string => {
   
   return `${diffInHours}h ${diffInMinutes}m`;
 };
+
+export const formatHoursToHMin = (hours: number): string => {
+  if (!hours || isNaN(hours)) return "0h 00m";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return `${h}h ${m < 10 ? '0' : ''}${m}m`;
+};
+
+export const hMinToHours = (h: number, m: number): number => {
+  return h + (m / 60);
+};
