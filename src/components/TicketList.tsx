@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Ticket } from "../types";
-import { STATUS_COLORS, STATUS_TEXT_COLORS } from "../constants";
+import { STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_DESCRIPTIONS } from "../constants";
 import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip } from "lucide-react";
 import { formatFirestoreDate } from "../utils/dateUtils";
 import { getTicketSlaStatus } from "../utils/slaUtils";
@@ -90,7 +90,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                     </span>
                   </div>
 
-                  <div className="w-[150px] px-6 py-4 shrink-0">
+                  <div className="w-[150px] px-6 py-4 shrink-0" title={STATUS_DESCRIPTIONS[ticket.status]}>
                     <div className="flex items-center gap-2">
                       <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_COLORS[ticket.status]}`} />
                       <span className={`text-[10px] font-black uppercase tracking-widest truncate ${STATUS_TEXT_COLORS[ticket.status]}`}>

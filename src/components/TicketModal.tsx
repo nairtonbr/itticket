@@ -618,6 +618,12 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                               <textarea 
                                 value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                                    e.preventDefault();
+                                    handleSaveEdit(i);
+                                  }
+                                }}
                                 className="w-full bg-white dark:bg-zinc-900 border border-blue-500 rounded-xl p-3 text-sm focus:outline-none dark:text-white resize-none"
                                 rows={3}
                               />
@@ -656,6 +662,12 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     <textarea 
                       value={newUpdate}
                       onChange={(e) => setNewUpdate(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                          e.preventDefault();
+                          handleAddUpdate();
+                        }
+                      }}
                       placeholder="Adicionar comentário ou tratativa..."
                       rows={3}
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none pr-12 dark:text-white"

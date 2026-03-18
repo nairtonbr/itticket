@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Ticket, TicketStatus } from "../types";
-import { STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_CARD_COLORS } from "../constants";
+import { STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_CARD_COLORS, STATUS_DESCRIPTIONS } from "../constants";
 import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -30,7 +30,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, status)}
     >
-      <div className="flex items-center justify-between px-2">
+      <div className="flex items-center justify-between px-2" title={STATUS_DESCRIPTIONS[status]}>
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${STATUS_COLORS[status]}`} />
           <h3 className="font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider text-[10px] md:text-xs">{status}</h3>

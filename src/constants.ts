@@ -28,3 +28,11 @@ export const STATUS_CARD_COLORS: Record<TicketStatus, string> = {
   "Aguardando Terceiros": "border-l-4 border-l-orange-500 bg-orange-50/30 dark:bg-orange-900/10",
   "Resolvido": "border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-900/10",
 };
+
+export const STATUS_DESCRIPTIONS: Record<TicketStatus, string> = {
+  "Aberto": "O chamado foi criado e aguarda triagem ou início do atendimento.",
+  "Em Andamento": "O chamado está sendo atendido por um analista.",
+  "Aguardando Cliente": "O analista solicitou informações ou ações do cliente para prosseguir.",
+  "Aguardando Terceiros": "O atendimento depende de um fornecedor ou parceiro externo.",
+  "Resolvido": "O problema foi solucionado e o chamado está concluído.",
+};
