@@ -158,7 +158,6 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
     }
 
     const totalHours = result.reduce((acc, t) => acc + (t.totalHours || 0), 0);
-    const billedHours = result.reduce((acc, t) => acc + (t.billedHours || 0), 0);
 
     const totalPages = Math.ceil(result.length / itemsPerPage);
     const paginatedList = result.slice((closedPage - 1) * itemsPerPage, closedPage * itemsPerPage);
@@ -168,10 +167,43 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
       fullList: result,
       totalCount: result.length,
       totalHours,
-      billedHours,
       totalPages
     };
   }, [tickets, closedClientFilter, closedCategoryFilter, closedDateStart, closedDateEnd, closedPage]);
+
+  const hoursByResponsible = useMemo(() => {
+    const data: Record<string, number> = {};
+    filteredTickets.forEach(t => {
+      if (t.responsible && t.totalHours) {
+        data[t.responsible] = (data[t.responsible] || 0) + t.totalHours;
+      }
+    });
+    return Object.entries(data)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTickets]);
+
+  const hoursByClient = useMemo(() => {
+    const data: Record<string, number> = {};
+    filteredTickets.forEach(t => {
+      if (t.client && t.totalHours) {
+        data[t.client] = (data[t.client] || 0) + t.totalHours;
+      }
+    });
+    return Object.entries(data)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [filteredTickets]);
+
+  const topResponsible = useMemo(() => {
+    if (hoursByResponsible.length === 0) return { name: "-", value: 0 };
+    return hoursByResponsible[0];
+  }, [hoursByResponsible]);
+
+  const topClient = useMemo(() => {
+    if (hoursByClient.length === 0) return { name: "-", value: 0 };
+    return hoursByClient[0];
+  }, [hoursByClient]);
 
   const slaCompliance = useMemo(() => {
     const resolved = filteredTickets.filter(t => t.status === "Resolvido");
@@ -358,11 +390,11 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
 
       <div ref={reportRef} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Volume Total" value={filteredTickets.length} icon={<BarChart3 />} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" />
-        <StatCard label="Taxa de Resolução" value={`${Math.round((filteredTickets.filter(t => t.status === "Resolvido").length / (filteredTickets.length || 1)) * 100)}%`} icon={<CheckCircle2 />} color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
-        <StatCard label="SLA Compliance" value={`${slaCompliance}%`} icon={<ShieldAlert />} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
-        <StatCard label="Tempo Médio" value="2.4h" icon={<Clock />} color="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" />
-      </div>
+          <StatCard label="Volume Total" value={filteredTickets.length} icon={<BarChart3 />} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" />
+          <StatCard label="Horas Trabalhadas" value={`${filteredTickets.reduce((acc, t) => acc + (t.totalHours || 0), 0).toFixed(1)}h`} icon={<Clock />} color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+          <StatCard label="Melhor Responsável" value={topResponsible.name} subValue={`${topResponsible.value.toFixed(1)}h`} icon={<Users />} color="bg-amber-500/10 text-amber-600 dark:text-amber-400" />
+          <StatCard label="Top Cliente" value={topClient.name} subValue={`${topClient.value.toFixed(1)}h`} icon={<TrendingUp />} color="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" />
+        </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <motion.div 
@@ -485,6 +517,71 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
                 <span className="text-[10px] font-bold text-zinc-500 uppercase truncate">{entry.name.split(' (')[0]}</span>
               </div>
             ))}
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-blue-600" />
+            </div>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Horas por Responsável</h3>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hoursByResponsible} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category"
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#52525b' : '#a1a1aa' }}
+                  width={100}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 6, 6, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+            </div>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Horas por Cliente</h3>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hoursByClient} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category"
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#52525b' : '#a1a1aa' }}
+                  width={100}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} />
+                <Bar dataKey="value" fill="#10b981" radius={[0, 6, 6, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </motion.div>
       </div>
@@ -756,7 +853,7 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
 );
 }
 
-function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
+function StatCard({ label, value, subValue, icon, color }: { label: string, value: string | number, subValue?: string, icon: React.ReactNode, color: string }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -769,7 +866,8 @@ function StatCard({ label, value, icon, color }: { label: string, value: string 
         </div>
       </div>
       <div className="space-y-0.5">
-        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none">{value}</p>
+        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none truncate" title={String(value)}>{value}</p>
+        {subValue && <p className="text-xs font-black text-blue-600 dark:text-blue-400 leading-none mt-1">{subValue}</p>}
         <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{label}</p>
       </div>
     </motion.div>

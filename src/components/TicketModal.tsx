@@ -29,7 +29,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
   const [totalHours, setTotalHours] = useState<number>(0);
-  const [billedHours, setBilledHours] = useState<number>(0);
   const [newUpdate, setNewUpdate] = useState("");
   const [editingCommentIndex, setEditingCommentIndex] = useState<number | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -71,7 +70,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setResponsible(ticket.responsible || "");
         setSla(ticket.sla || "");
         setTotalHours(ticket.totalHours || 0);
-        setBilledHours(ticket.billedHours || 0);
         setAttachments(ticket.attachments || []);
       } else {
         setTitle("");
@@ -83,7 +81,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setResponsible("");
         setSla("");
         setTotalHours(0);
-        setBilledHours(0);
         setAttachments([]);
       }
       lastTicketIdRef.current = currentId;
@@ -120,7 +117,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       category: category || undefined,
       priority: priority || undefined,
       totalHours,
-      billedHours,
       responsible,
       sla,
       attachments
@@ -505,16 +501,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                             Contabilizando horas automaticamente...
                           </div>
                         )}
-                      </div>
-                      <div className="flex-1 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-700">
-                        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Horas Faturadas</p>
-                        <input 
-                          type="number"
-                          step="0.1"
-                          value={billedHours}
-                          onChange={(e) => setBilledHours(parseFloat(e.target.value) || 0)}
-                          className="bg-transparent text-xl font-black text-zinc-900 dark:text-white w-full focus:outline-none"
-                        />
                       </div>
                     </div>
                   </div>

@@ -216,10 +216,24 @@ export default function App() {
   const [zoom, setZoom] = useState(1);
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true';
+      const saved = localStorage.getItem('darkMode');
+      if (saved !== null) return saved === 'true';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
     return false;
   });
+
+  // Listen for system theme changes if no manual preference is set
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   // Firebase Auth Observer
   useEffect(() => {
@@ -1132,6 +1146,8 @@ export default function App() {
                 onCreateUser={handleCreateUser}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />

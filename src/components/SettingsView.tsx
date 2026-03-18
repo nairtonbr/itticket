@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert } from "lucide-react";
+import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon } from "lucide-react";
 import { AppSettings, ClientName, UserProfile, UserRole } from "../types";
 import { CLIENTS } from "../constants";
 
@@ -12,9 +12,11 @@ interface SettingsViewProps {
   onCreateUser: (userData: any) => Promise<void>;
   onUpdateUser: (uid: string, data: Partial<UserProfile>) => Promise<void>;
   onDeleteUser: (uid: string) => Promise<void>;
+  darkMode: boolean;
+  setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser }: SettingsViewProps) {
+export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
@@ -235,6 +237,41 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               >
                 <Save className="w-4 h-4" />
                 Salvar
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Tema do Sistema</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Escolha entre o tema claro ou escuro para a interface.</p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDarkMode(false)}
+                className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                  !darkMode 
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400" 
+                    : "border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:border-zinc-200 dark:hover:border-zinc-700"
+                }`}
+              >
+                <Sun className="w-5 h-5" />
+                <span className="font-bold">Tema Claro</span>
+              </button>
+              <button
+                onClick={() => setDarkMode(true)}
+                className={`flex-1 flex items-center justify-center gap-3 p-4 rounded-2xl border-2 transition-all ${
+                  darkMode 
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400" 
+                    : "border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 hover:border-zinc-200 dark:hover:border-zinc-700"
+                }`}
+              >
+                <Moon className="w-5 h-5" />
+                <span className="font-bold">Tema Escuro</span>
               </button>
             </div>
           </div>
