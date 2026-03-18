@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Ticket } from "../types";
 import { STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_DESCRIPTIONS } from "../constants";
-import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip } from "lucide-react";
+import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip, AlertCircle, Star } from "lucide-react";
 import { formatFirestoreDate } from "../utils/dateUtils";
 import { getTicketSlaStatus } from "../utils/slaUtils";
 
@@ -51,8 +51,13 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   onClick={() => onTicketClick(ticket)}
                   className={`flex items-center group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-all duration-200 h-[80px] relative overflow-hidden ${
                     isExpired ? "bg-red-50/30 dark:bg-red-900/5" : isApproaching ? "bg-yellow-50/30 dark:bg-yellow-900/5" : ""
-                  }`}
+                  } ${ticket.isImportant ? "ring-1 ring-inset ring-yellow-500/50 bg-yellow-50/20 dark:bg-yellow-900/10" : ""}`}
                 >
+                  {ticket.isImportant && (
+                    <div className="absolute right-0 top-0 w-8 h-8 flex items-center justify-center">
+                      <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                    </div>
+                  )}
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 scale-y-0 group-hover:scale-y-100 transition-transform duration-300 origin-top" />
                   
                   <div className="w-[120px] px-6 py-4 shrink-0 overflow-hidden">
@@ -60,7 +65,11 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                       <span className="text-[10px] font-black font-mono text-zinc-400 dark:text-zinc-500 tracking-tighter" title={ticket.id}>
                         #{ticket.id}
                       </span>
-                      {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />}
+                      {isExpired && (
+                        <div className="flex items-center gap-1 text-red-600 dark:text-red-400 animate-pulse" title="SLA Vencido!">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                      )}
                       
                       <div className="flex items-center gap-1">
                         {ticket.updates && ticket.updates.length > 0 && (

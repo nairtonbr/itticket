@@ -84,7 +84,6 @@ export default function App() {
   });
   const [schedules, setSchedules] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
-  const [lastSlaNotification, setLastSlaNotification] = useState<Record<string, number>>({});
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -131,34 +130,38 @@ export default function App() {
 
     const checkSlas = async () => {
       const now = Date.now();
-      const newNotifications = { ...lastSlaNotification };
-      let updated = false;
-
+      
       for (const ticket of tickets) {
         if (ticket.status === "Resolvido") continue;
 
         const status = getTicketSlaStatus(ticket);
         if (status === "expired") {
-          const lastNotify = lastSlaNotification[ticket.id] || 0;
+          const lastNotifyDate = getFirestoreDate(ticket.lastSlaNotification);
+          const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
           const twoHoursMs = 2 * 60 * 60 * 1000;
           
           if (lastNotify === 0 || (now - lastNotify) >= twoHoursMs) {
-            await sendWebhook(ticket, settings, "sla_breach");
-            newNotifications[ticket.id] = now;
-            updated = true;
+            try {
+              // Update Firestore first to prevent other users from sending
+              await updateDoc(doc(db, "tickets", ticket.id), {
+                lastSlaNotification: Timestamp.now()
+              });
+              
+              // Then send the webhook
+              await sendWebhook(ticket, settings, "sla_breach");
+              console.log(`SLA Breach webhook sent for ticket ${ticket.id}`);
+            } catch (error) {
+              console.error(`Error processing SLA breach for ticket ${ticket.id}:`, error);
+            }
           }
         }
-      }
-
-      if (updated) {
-        setLastSlaNotification(newNotifications);
       }
     };
 
     const interval = setInterval(checkSlas, 60000);
     checkSlas();
     return () => clearInterval(interval);
-  }, [tickets, settings, lastSlaNotification]);
+  }, [tickets, settings]);
 
   const handleArchiveOldTickets = async () => {
     if (!auth.currentUser || userProfile?.role !== "admin") return;
@@ -704,6 +707,10 @@ export default function App() {
     });
 
     return filtered.sort((a, b) => {
+      // Prioritize important tickets
+      if (a.isImportant && !b.isImportant) return -1;
+      if (!a.isImportant && b.isImportant) return 1;
+
       let comparison = 0;
       if (sortBy === "priority") {
         const priorityOrder = { "Urgente": 4, "Alta": 3, "Média": 2, "Baixa": 1 };

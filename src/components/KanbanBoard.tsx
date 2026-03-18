@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Ticket, TicketStatus } from "../types";
 import { STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_CARD_COLORS, STATUS_DESCRIPTIONS } from "../constants";
-import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip } from "lucide-react";
+import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip, Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getFirestoreDate } from "../utils/dateUtils";
@@ -54,21 +54,30 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
               draggable
               onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, ticket.id)}
               onClick={() => onTicketClick(ticket)}
-              className={`p-5 rounded-2xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white dark:bg-zinc-900 ${
+              className={`p-5 rounded-2xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white dark:bg-zinc-900 relative ${
                 isExpired 
                   ? "border-red-500/50 ring-1 ring-red-500/20" 
                   : isApproaching 
                     ? "border-yellow-500/50" 
                     : "border-zinc-200 dark:border-zinc-800"
-              }`}
+              } ${ticket.isImportant ? "ring-2 ring-yellow-500/50 bg-yellow-50/10 dark:bg-yellow-900/10" : ""}`}
             >
+              {ticket.isImportant && (
+                <div className="absolute -right-1 -top-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-sm z-10 border-2 border-white dark:border-zinc-900">
+                  <Star className="w-3 h-3 text-white fill-current" />
+                </div>
+              )}
               <div className="flex justify-between items-start gap-2 mb-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black text-zinc-400 dark:text-zinc-600 uppercase tracking-tighter">#{ticket.id}</span>
                   <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                     {ticket.client}
                   </span>
-                  {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />}
+                  {isExpired && (
+                    <div className="flex items-center gap-1 text-red-600 dark:text-red-400 animate-pulse" title="SLA Vencido!">
+                      <AlertCircle className="w-4 h-4" />
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 justify-end">
                   {ticket.category && (

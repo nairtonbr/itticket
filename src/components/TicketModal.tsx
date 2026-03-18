@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History } from "lucide-react";
+import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star } from "lucide-react";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
@@ -28,6 +28,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
+  const [isImportant, setIsImportant] = useState(false);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [liveElapsed, setLiveElapsed] = useState(0);
   const [newUpdate, setNewUpdate] = useState("");
@@ -78,6 +79,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setPriority(ticket.priority || "");
         setResponsible(ticket.responsible || "");
         setSla(ticket.sla || "");
+        setIsImportant(ticket.isImportant || false);
         setTotalHours(ticket.totalHours || 0);
         setAttachments(ticket.attachments || []);
       } else {
@@ -89,6 +91,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setPriority("");
         setResponsible("");
         setSla("");
+        setIsImportant(false);
         setTotalHours(0);
         setAttachments([]);
       }
@@ -128,6 +131,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       totalHours,
       responsible,
       sla,
+      isImportant,
       attachments
     };
 
@@ -247,6 +251,13 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsImportant(!isImportant)}
+              className={`p-2 rounded-full transition-all ${isImportant ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20" : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}
+              title={isImportant ? "Remover destaque" : "Marcar como importante"}
+            >
+              <Star className={`w-5 h-5 ${isImportant ? "fill-current" : ""}`} />
+            </button>
             {ticket && (
               <button 
                 onClick={handleSubmit}

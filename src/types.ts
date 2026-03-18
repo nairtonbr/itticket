@@ -35,6 +35,8 @@ export interface Ticket {
   attachments?: TicketAttachment[];
   archived?: number; // 0 for active, 1 for archived
   inProgressSince?: string; // ISO date when status became "Em Andamento"
+  isImportant?: boolean;
+  lastSlaNotification?: any; // Firestore Timestamp
   history?: {
     action: string;
     user: string;
