@@ -869,7 +869,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900`}>
+    <div className={`h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900`}>
       <Toaster position="top-right" />
       {/* Sidebar */}
       <AnimatePresence mode="wait">
@@ -879,7 +879,7 @@ export default function App() {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -300, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800 lg:static shrink-0"
+            className="fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-zinc-900 border-r border-zinc-100 dark:border-zinc-800 lg:static lg:h-full shrink-0"
           >
             <div className="h-full flex flex-col p-6">
               <div className="flex items-center justify-between mb-10 px-2">
