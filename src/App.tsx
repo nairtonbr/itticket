@@ -502,7 +502,7 @@ export default function App() {
         return nextId.toString();
       });
       
-      const formattedData = {
+      const formattedData: any = {
         ...ticketData,
         id: ticketId,
         title: ticketData.title?.toUpperCase(),
@@ -517,6 +517,10 @@ export default function App() {
           details: `Chamado #${ticketId} criado no sistema`
         }]
       };
+
+      if (ticketData.status === "Em Andamento") {
+        formattedData.inProgressSince = now;
+      }
 
       await setDoc(doc(db, "tickets", ticketId), formattedData);
       
@@ -559,6 +563,26 @@ export default function App() {
             });
           }
         });
+
+        // Automatic time tracking logic
+        const oldStatus = originalTicket.status;
+        const newStatus = updates.status;
+
+        if (newStatus && newStatus !== oldStatus) {
+          if (newStatus === "Em Andamento") {
+            // Started working
+            formattedUpdates.inProgressSince = now;
+          } else if (oldStatus === "Em Andamento" && originalTicket.inProgressSince) {
+            // Stopped working
+            const startTime = new Date(originalTicket.inProgressSince).getTime();
+            const endTime = new Date(now).getTime();
+            const elapsedHours = (endTime - startTime) / (1000 * 60 * 60);
+            
+            const currentTotal = updates.totalHours !== undefined ? updates.totalHours : (originalTicket.totalHours || 0);
+            formattedUpdates.totalHours = currentTotal + elapsedHours;
+            formattedUpdates.inProgressSince = null; // Clear it
+          }
+        }
       }
 
       const finalHistory = [...(originalTicket?.history || []), ...historyEntries];

@@ -499,6 +499,12 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           onChange={(e) => setTotalHours(parseFloat(e.target.value) || 0)}
                           className="bg-transparent text-xl font-black text-zinc-900 dark:text-white w-full focus:outline-none"
                         />
+                        {ticket?.inProgressSince && (
+                          <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-emerald-500 uppercase tracking-widest animate-pulse">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            Contabilizando horas automaticamente...
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-700">
                         <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Horas Faturadas</p>
@@ -561,9 +567,11 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteComment(i)}
-                                  className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-400 hover:text-red-500 transition-colors"
+                                  className="flex items-center gap-1 px-2 py-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-zinc-400 hover:text-red-500 transition-colors"
+                                  title="Excluir comentário"
                                 >
                                   <Trash2 className="w-3 h-3" />
+                                  <span className="text-[10px] font-bold">Excluir</span>
                                 </button>
                               </div>
                             )}
@@ -709,9 +717,11 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           <button 
                             type="button"
                             onClick={() => removeAttachment(i)}
-                            className="p-2 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl text-red-500"
+                            className="flex items-center gap-1 px-2 py-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl text-red-500 transition-colors"
+                            title="Excluir anexo"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-bold">Excluir</span>
                           </button>
                         </div>
                       </div>

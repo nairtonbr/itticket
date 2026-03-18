@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Ticket, TicketStatus } from "../types";
 import { STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_CARD_COLORS } from "../constants";
-import { Clock, User as UserIcon, AlertCircle, Loader2 } from "lucide-react";
+import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getFirestoreDate } from "../utils/dateUtils";
@@ -100,6 +100,15 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
                   <span className="text-[10px] font-bold text-zinc-600 dark:text-zinc-400 truncate max-w-[80px]">
                     {ticket.responsible?.split(' ')[0] || "N/A"}
                   </span>
+                  
+                  <div className="flex items-center gap-1 ml-1">
+                    {ticket.updates && ticket.updates.length > 0 && (
+                      <MessageSquare className="w-3 h-3 text-zinc-400" />
+                    )}
+                    {ticket.attachments && ticket.attachments.length > 0 && (
+                      <Paperclip className="w-3 h-3 text-zinc-400" />
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex items-center gap-1 text-zinc-400 dark:text-zinc-500">

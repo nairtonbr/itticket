@@ -34,6 +34,7 @@ export interface Ticket {
   updates: TicketUpdate[];
   attachments?: TicketAttachment[];
   archived?: number; // 0 for active, 1 for archived
+  inProgressSince?: string; // ISO date when status became "Em Andamento"
   history?: {
     action: string;
     user: string;

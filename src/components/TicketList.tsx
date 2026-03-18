@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Ticket } from "../types";
 import { STATUS_COLORS, STATUS_TEXT_COLORS } from "../constants";
-import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2 } from "lucide-react";
+import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip } from "lucide-react";
 import { formatFirestoreDate } from "../utils/dateUtils";
 import { getTicketSlaStatus } from "../utils/slaUtils";
 
@@ -61,6 +61,15 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                         #{ticket.id}
                       </span>
                       {isExpired && <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />}
+                      
+                      <div className="flex items-center gap-1">
+                        {ticket.updates && ticket.updates.length > 0 && (
+                          <MessageSquare className="w-3 h-3 text-zinc-400" />
+                        )}
+                        {ticket.attachments && ticket.attachments.length > 0 && (
+                          <Paperclip className="w-3 h-3 text-zinc-400" />
+                        )}
+                      </div>
                     </div>
                   </div>
                   
