@@ -133,7 +133,7 @@ export default function App() {
 
   // SLA Monitor
   useEffect(() => {
-    if (!tickets.length || !settings?.webhookUrl) return;
+    if (!tickets.length || !settings) return;
 
     const checkSlas = async () => {
       const now = Date.now();

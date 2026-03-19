@@ -11,15 +11,19 @@ export const sendWhatsAppNotification = async (
   }
 
   const clientPhone = settings.clientPhones?.[ticket.client];
+  const slaPhone = settings.slaAlertPhone;
   
-  if (!clientPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
-    console.log("WhatsApp notification skipped: Missing configuration or client phone.");
+  // Use dedicated SLA alert phone if available for SLA breach, otherwise use client phone
+  const targetPhone = (type === 'sla_breach' && slaPhone) ? slaPhone : clientPhone;
+  
+  if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
+    console.log("WhatsApp notification skipped: Missing configuration or target phone.");
     return;
   }
 
   // Format phone number or group ID
-  const isGroupId = clientPhone.includes('@g.us') || clientPhone.includes('-');
-  const formattedTarget = isGroupId ? clientPhone.trim() : clientPhone.replace(/\D/g, '');
+  const isGroupId = targetPhone.includes('@g.us') || targetPhone.includes('-');
+  const formattedTarget = isGroupId ? targetPhone.trim() : targetPhone.replace(/\D/g, '');
   
   let message = "";
 

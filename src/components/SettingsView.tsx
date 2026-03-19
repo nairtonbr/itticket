@@ -27,6 +27,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [evolutionInstance, setEvolutionInstance] = useState(settings.evolutionInstance || "");
   const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
   const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
+  const [slaAlertPhone, setSlaAlertPhone] = useState(settings.slaAlertPhone || "");
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
   const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
@@ -53,6 +54,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setEvolutionInstance(settings.evolutionInstance || "");
     setWhatsappEnabled(settings.whatsappEnabled ?? true);
     setClientPhones(settings.clientPhones || {});
+    setSlaAlertPhone(settings.slaAlertPhone || "");
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
@@ -102,6 +104,11 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     const newPhones = { ...clientPhones, [client]: phone };
     setClientPhones(newPhones);
     onUpdateSettings({ clientPhones: newPhones });
+  };
+
+  const handleUpdateSlaPhone = (phone: string) => {
+    setSlaAlertPhone(phone);
+    onUpdateSettings({ slaAlertPhone: phone });
   };
 
   const handleTestWhatsApp = async () => {
@@ -569,6 +576,19 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   />
                 </div>
               ))}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-blue-700 dark:text-blue-400">Destinatário Alertas SLA</span>
+                  <AlertCircle className="w-4 h-4 text-blue-500" />
+                </div>
+                <input
+                  type="text"
+                  value={slaAlertPhone}
+                  onChange={(e) => handleUpdateSlaPhone(e.target.value)}
+                  placeholder="Ex: 5511999999999 ou 123456789@g.us"
+                  className="w-full bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                />
+              </div>
             </div>
           </div>
         </motion.div>

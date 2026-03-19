@@ -62,6 +62,7 @@ export interface AppSettings {
   whatsappEnabled?: boolean;
   webhookEnabled?: boolean;
   clientPhones?: Record<string, string>; // ClientName -> Phone Number
+  slaAlertPhone?: string; // Dedicated phone/group for SLA alerts
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";
