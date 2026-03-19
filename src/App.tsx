@@ -81,7 +81,9 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({
     webhookUrl: "",
     clientLogos: {},
-    clientResponsibles: {}
+    clientResponsibles: {},
+    whatsappEnabled: true,
+    webhookEnabled: true
   });
   const [schedules, setSchedules] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -550,6 +552,7 @@ export default function App() {
       const formattedData: any = {
         ...ticketData,
         id: ticketId,
+        status: "Aberto",
         title: ticketData.title?.toUpperCase(),
         createdAt: now,
         updatedAt: now,
@@ -648,7 +651,7 @@ export default function App() {
 
       const finalTicket = { ...originalTicket, ...formattedUpdates } as Ticket;
       
-      if (settings.whatsappEnabled) {
+      if (settings.whatsappEnabled !== false) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const isCommentAdded = updates.updates !== undefined && (updates.updates.length > (originalTicket?.updates?.length || 0));
         
@@ -656,10 +659,11 @@ export default function App() {
         if (isStatusChange) whatsappType = "status";
         else if (isCommentAdded) whatsappType = "comment";
 
+        console.log(`Sending WhatsApp notification: ${whatsappType}`, { isStatusChange, isCommentAdded });
         await sendWhatsAppNotification(finalTicket, settings, whatsappType);
       }
 
-      if (settings.webhookUrl) {
+      if (settings.webhookEnabled !== false && settings.webhookUrl) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const webhookType = isStatusChange ? "action" : "update";
         await sendWebhook(finalTicket, settings, webhookType);

@@ -137,7 +137,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       title,
       description,
       client: user?.role === "client" ? user.associatedClient : client,
-      status,
+      status: ticket ? status : "Aberto",
       category: category || undefined,
       priority: priority || undefined,
       totalHours,
@@ -441,27 +441,29 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
 
                     {/* Right Column */}
                     <div className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">
-                          Status <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative group">
-                          <select 
-                            value={status}
-                            onChange={(e) => {
-                              setStatus(e.target.value as TicketStatus);
-                              if (errors.status) setErrors(prev => ({ ...prev, status: "" }));
-                            }}
-                            className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
-                              errors.status ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
-                            }`}
-                          >
-                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                      {ticket && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">
+                            Status <span className="text-red-500">*</span>
+                          </label>
+                          <div className="relative group">
+                            <select 
+                              value={status}
+                              onChange={(e) => {
+                                setStatus(e.target.value as TicketStatus);
+                                if (errors.status) setErrors(prev => ({ ...prev, status: "" }));
+                              }}
+                              className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer transition-all ${
+                                errors.status ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
+                              }`}
+                            >
+                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 pointer-events-none group-hover:text-zinc-600 transition-colors" />
+                          </div>
+                          {errors.status && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.status}</p>}
                         </div>
-                        {errors.status && <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mt-1 px-1">{errors.status}</p>}
-                      </div>
+                      )}
 
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">

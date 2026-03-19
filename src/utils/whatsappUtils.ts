@@ -33,6 +33,11 @@ export const sendWhatsAppNotification = async (
     }
   };
 
+  const getStatusDisplay = (status: string) => {
+    if (status === "Resolvido") return "Concluido";
+    return status;
+  };
+
   const formatUpdates = (updates: any[], limit = 3) => {
     if (!updates || updates.length === 0) return "";
     const lastUpdates = updates.slice(-limit);
@@ -46,7 +51,7 @@ export const sendWhatsAppNotification = async (
   if (type === 'create') {
     message = `*NOVO TICKET ABERTO*\n`;
     message += `🆔 ID TICKET: ${ticket.id}\n`;
-    message += `${getStatusIcon(ticket.status)} Status: ${ticket.status}\n`;
+    message += `${getStatusIcon(ticket.status)} Status: ${getStatusDisplay(ticket.status)}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     message += `⏰ Prazo para atualização: ${ticket.sla}`;
   } else if (type === 'comment') {
@@ -55,7 +60,7 @@ export const sendWhatsAppNotification = async (
     message += formatUpdates(ticket.updates);
   } else if (type === 'status') {
     message = `🆔 ID TICKET: ${ticket.id}\n`;
-    message += `${getStatusIcon(ticket.status)} Status: ${ticket.status}\n`;
+    message += `${getStatusIcon(ticket.status)} Status: ${getStatusDisplay(ticket.status)}\n`;
     message += `🔰 Assunto: ${ticket.title}`;
     
     // For specific statuses, add updates
@@ -65,7 +70,8 @@ export const sendWhatsAppNotification = async (
         message += `\n${updatesText}`;
       }
     }
-  } else if (type === 'sla_breach') {
+  }
+ else if (type === 'sla_breach') {
     message = `🆔 ID TICKET: ${ticket.id}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     message += `🚨 ALERTA: SLA Vencido!`;
