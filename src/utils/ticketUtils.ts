@@ -3,7 +3,7 @@ import { getTicketSlaStatus } from "./slaUtils";
 
 export { getTicketSlaStatus };
 
-export const sendWebhook = async (ticket: Ticket, settings: AppSettings, type: 'create' | 'update' | 'sla_breach') => {
+export const sendWebhook = async (ticket: Ticket, settings: AppSettings, type: 'create' | 'update' | 'sla_breach' | 'action') => {
   if (!settings.webhookUrl) return;
 
   try {

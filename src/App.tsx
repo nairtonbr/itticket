@@ -623,7 +623,9 @@ export default function App() {
 
       const updatedTicket = tickets.find(t => t.id === ticketId);
       if (updatedTicket) {
-        await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, "update");
+        const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
+        const webhookType = isStatusChange ? "action" : "update";
+        await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, webhookType);
       }
       toast.success("Chamado atualizado!");
     } catch (error) {
