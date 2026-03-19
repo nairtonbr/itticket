@@ -56,6 +56,10 @@ export interface AppSettings {
     count: number;
   };
   nextTicketId?: number;
+  evolutionApiUrl?: string;
+  evolutionApiKey?: string;
+  evolutionInstance?: string;
+  clientPhones?: Record<string, string>; // ClientName -> Phone Number
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";

@@ -17,8 +17,12 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
+  const [evolutionApiUrl, setEvolutionApiUrl] = useState(settings.evolutionApiUrl || "");
+  const [evolutionApiKey, setEvolutionApiKey] = useState(settings.evolutionApiKey || "");
+  const [evolutionInstance, setEvolutionInstance] = useState(settings.evolutionInstance || "");
+  const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
   const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
@@ -36,6 +40,10 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
+    setEvolutionApiUrl(settings.evolutionApiUrl || "");
+    setEvolutionApiKey(settings.evolutionApiKey || "");
+    setEvolutionInstance(settings.evolutionInstance || "");
+    setClientPhones(settings.clientPhones || {});
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
@@ -79,6 +87,12 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     };
     setClientResponsibles(newResponsibles);
     onUpdateSettings({ clientResponsibles: newResponsibles });
+  };
+
+  const handleUpdatePhone = (client: string, phone: string) => {
+    const newPhones = { ...clientPhones, [client]: phone };
+    setClientPhones(newPhones);
+    onUpdateSettings({ clientPhones: newPhones });
   };
 
   const handleAddClient = () => {
@@ -207,6 +221,17 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
           <UsersIcon className="w-4 h-4" />
           Usuários
         </button>
+        <button
+          onClick={() => setActiveTab("whatsapp")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === "whatsapp" 
+              ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm" 
+              : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          <Globe className="w-4 h-4" />
+          WhatsApp
+        </button>
       </div>
 
       {activeTab === "general" && (
@@ -330,6 +355,94 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               <span className="text-sm font-bold">{message.text}</span>
             </motion.div>
           )}
+        </motion.div>
+      )}
+
+      {activeTab === "whatsapp" && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-8"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg">
+                <Globe className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Integração EvolutionAPI</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Configure sua instância da EvolutionAPI para enviar notificações diretas via WhatsApp.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">URL da API</label>
+                <input
+                  type="url"
+                  value={evolutionApiUrl}
+                  onChange={(e) => setEvolutionApiUrl(e.target.value)}
+                  placeholder="https://api.sua-instancia.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Nome da Instância</label>
+                <input
+                  type="text"
+                  value={evolutionInstance}
+                  onChange={(e) => setEvolutionInstance(e.target.value)}
+                  placeholder="Ex: Suporte"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">API Key Global</label>
+                <input
+                  type="password"
+                  value={evolutionApiKey}
+                  onChange={(e) => setEvolutionApiKey(e.target.value)}
+                  placeholder="Sua API Key da EvolutionAPI"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance })}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Salvar Credenciais
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <UsersIcon className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">WhatsApp ou ID do Grupo por Cliente</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe um número de WhatsApp ou ID de Grupo (JID) a cada cliente.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...CLIENTS, ...customClients].sort().map((client) => (
+                <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{client}</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={clientPhones[client] || ""}
+                    onChange={(e) => handleUpdatePhone(client, e.target.value)}
+                    placeholder="Ex: 5511999999999 ou 123456789@g.us"
+                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         </motion.div>
       )}
 

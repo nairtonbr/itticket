@@ -36,6 +36,7 @@ import { ScheduleView } from "./components/ScheduleView";
 import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile } from "./types";
 import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
+import { sendWhatsAppNotification } from "./utils/whatsappUtils";
 import { startOfMonth, endOfMonth, isWithinInterval, subDays } from "date-fns";
 import { getFirestoreDate } from "./utils/dateUtils";
 import { db, auth, handleFirestoreError, OperationType } from "./firebase";
@@ -153,7 +154,8 @@ export default function App() {
               
               // Then send the webhook
               await sendWebhook(ticket, settings, "sla_breach");
-              console.log(`SLA Breach webhook sent for ticket ${ticket.id}`);
+              await sendWhatsAppNotification(ticket, settings, "sla_breach");
+              console.log(`SLA Breach notifications sent for ticket ${ticket.id}`);
             } catch (error) {
               console.error(`Error processing SLA breach for ticket ${ticket.id}:`, error);
             }
@@ -241,6 +243,28 @@ export default function App() {
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Alt + N: New Ticket
+      if (e.altKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        if (userProfile?.role !== 'client' || userProfile?.associatedClient) {
+          setSelectedTicket(null);
+          setIsModalOpen(true);
+        }
+      }
+      // Alt + B: Toggle Sidebar
+      if (e.altKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        setIsSidebarOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [userProfile, setIsModalOpen, setSelectedTicket, setIsSidebarOpen]);
 
   // Firebase Auth Observer
   useEffect(() => {
@@ -546,6 +570,7 @@ export default function App() {
       await setDoc(doc(db, "tickets", ticketId), formattedData);
       
       await sendWebhook(formattedData as Ticket, settings, "create");
+      await sendWhatsAppNotification(formattedData as Ticket, settings, "create");
       setIsModalOpen(false);
       toast.success("Chamado criado com sucesso!");
     } catch (error) {
@@ -626,6 +651,7 @@ export default function App() {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const webhookType = isStatusChange ? "action" : "update";
         await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, webhookType);
+        await sendWhatsAppNotification({ ...updatedTicket, ...formattedUpdates }, settings, webhookType);
       }
       toast.success("Chamado atualizado!");
     } catch (error) {
