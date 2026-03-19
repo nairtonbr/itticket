@@ -134,15 +134,15 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
               {ticket.sla && (
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
-                    <span className={isExpired ? "text-red-500" : "text-zinc-400"}>SLA</span>
-                    <span className={isExpired ? "text-red-500" : "text-blue-600 dark:text-blue-400"}>{ticket.sla}</span>
+                    <span className={isExpired || isApproaching ? "text-red-500" : "text-zinc-400"}>SLA</span>
+                    <span className={isExpired || isApproaching ? "text-red-600 dark:text-red-400 font-black" : "text-blue-600 dark:text-blue-400"}>{ticket.sla}</span>
                   </div>
-                  <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1 rounded-full overflow-hidden">
+                  <div className={`w-full h-1 rounded-full overflow-hidden ${isExpired ? "bg-red-100 dark:bg-red-900/20" : "bg-zinc-100 dark:bg-zinc-800"}`}>
                     <motion.div 
                       initial={{ width: 0 }}
                       animate={{ width: `${slaProgress}%` }}
                       className={`h-full transition-all duration-1000 ${
-                        isExpired ? "bg-red-500" : isApproaching ? "bg-yellow-500" : "bg-blue-500"
+                        isExpired || isApproaching ? "bg-red-500" : "bg-blue-500"
                       }`} 
                     />
                   </div>

@@ -50,7 +50,9 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   key={ticket.id}
                   onClick={() => onTicketClick(ticket)}
                   className={`flex items-center group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-all duration-200 h-[80px] relative overflow-hidden ${
-                    isExpired ? "bg-red-50/30 dark:bg-red-900/5" : isApproaching ? "bg-yellow-50/30 dark:bg-yellow-900/5" : ""
+                    isExpired || isApproaching
+                      ? "bg-red-50/40 dark:bg-red-900/10 border-l-4 border-l-red-500" 
+                      : "border-l-4 border-l-transparent"
                   } ${ticket.isImportant ? "ring-1 ring-inset ring-yellow-500/50 bg-yellow-50/20 dark:bg-yellow-900/10" : ""}`}
                 >
                   {ticket.isImportant && (
@@ -62,7 +64,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   
                   <div className="w-[120px] px-6 py-4 shrink-0 overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black font-mono text-zinc-400 dark:text-zinc-500 tracking-tighter" title={ticket.id}>
+                      <span className={`text-[10px] font-black font-mono tracking-tighter ${isExpired || isApproaching ? "text-red-700 dark:text-red-300" : "text-zinc-400 dark:text-zinc-500"}`} title={ticket.id}>
                         #{ticket.id}
                       </span>
                       {isExpired && (
@@ -84,7 +86,9 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   
                   <div className="flex-1 px-6 py-4 overflow-hidden">
                     <div className="max-w-md">
-                      <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight">
+                      <p className={`font-bold text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight ${
+                        isExpired || isApproaching ? "text-red-700 dark:text-red-300" : "text-zinc-900 dark:text-zinc-100"
+                      }`}>
                         {ticket.title}
                       </p>
                       <p className="text-[11px] text-zinc-500 dark:text-zinc-500 line-clamp-1 mt-0.5 font-medium">
@@ -141,11 +145,9 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
 
                   <div className="w-[100px] px-6 py-4 shrink-0">
                     <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
-                      isExpired 
+                      isExpired || isApproaching
                         ? "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800" 
-                        : isApproaching
-                          ? "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800"
-                          : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800"
+                        : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800"
                     }`}>
                       {ticket.sla || "-"}
                     </span>

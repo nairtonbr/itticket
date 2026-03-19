@@ -8,26 +8,38 @@ export const parseSlaToMs = (sla: string): number => {
   const lowerSla = sla.toLowerCase().trim();
   
   // Handle common formats
-  if (lowerSla.includes('h')) {
-    const hours = parseInt(lowerSla.replace('h', ''));
-    if (!isNaN(hours)) return hours * 60 * 60 * 1000;
-  }
-  
-  if (lowerSla.includes('m')) {
-    const minutes = parseInt(lowerSla.replace('m', ''));
-    if (!isNaN(minutes)) return minutes * 60 * 1000;
+  let totalMs = 0;
+  let found = false;
+
+  const daysMatch = lowerSla.match(/(\d+)\s*d/);
+  if (daysMatch) {
+    totalMs += parseInt(daysMatch[1]) * 24 * 60 * 60 * 1000;
+    found = true;
   }
 
-  if (lowerSla.includes('d')) {
-    const days = parseInt(lowerSla.replace('d', ''));
-    if (!isNaN(days)) return days * 24 * 60 * 60 * 1000;
+  const hoursMatch = lowerSla.match(/(\d+)\s*h/);
+  if (hoursMatch) {
+    totalMs += parseInt(hoursMatch[1]) * 60 * 60 * 1000;
+    found = true;
   }
+  
+  const minutesMatch = lowerSla.match(/(\d+)\s*m/);
+  if (minutesMatch) {
+    totalMs += parseInt(minutesMatch[1]) * 60 * 1000;
+    found = true;
+  }
+
+  if (found) return totalMs;
 
   // Special cases
   if (lowerSla === 'urgente') return 1 * 60 * 60 * 1000; // 1 hour
   if (lowerSla === 'alta') return 4 * 60 * 60 * 1000; // 4 hours
   if (lowerSla === 'média') return 24 * 60 * 60 * 1000; // 24 hours
   if (lowerSla === 'baixa') return 48 * 60 * 60 * 1000; // 48 hours
+
+  // Fallback: if it's just a number, treat as hours
+  const numericSla = parseInt(lowerSla);
+  if (!isNaN(numericSla)) return numericSla * 60 * 60 * 1000;
 
   return 0;
 };
