@@ -3,8 +3,8 @@ import { motion } from "framer-motion";
 import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon } from "lucide-react";
 import { AppSettings, ClientName, UserProfile, UserRole } from "../types";
 import { CLIENTS } from "../constants";
-import { testWhatsAppConnection } from "../utils/whatsappUtils";
-import { Send } from "lucide-react";
+import { testWhatsAppConnection, checkInstanceStatus } from "../utils/whatsappUtils";
+import { Send, Activity } from "lucide-react";
 
 interface SettingsViewProps {
   isAdmin: boolean;
@@ -41,6 +41,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [testNumber, setTestNumber] = useState("");
   const [isTesting, setIsTesting] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
@@ -118,6 +119,29 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
       setMessage({ type: "error", text: `Falha no teste: ${error.message}` });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleCheckStatus = async () => {
+    setIsCheckingStatus(true);
+    setMessage(null);
+
+    try {
+      const status = await checkInstanceStatus({ evolutionApiUrl, evolutionApiKey, evolutionInstance });
+      const statusMap: Record<string, string> = {
+        'open': 'Conectada (Online) ✅',
+        'close': 'Desconectada (Offline) ❌',
+        'connecting': 'Conectando... ⏳',
+        'unknown': 'Desconhecido ❓'
+      };
+      setMessage({ 
+        type: status === 'open' ? "success" : "error", 
+        text: `Status da Instância: ${statusMap[status] || status}` 
+      });
+    } catch (error: any) {
+      setMessage({ type: "error", text: `Erro ao verificar status: ${error.message}` });
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -432,7 +456,15 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               </div>
             </div>
             
-            <div className="flex justify-end pt-2">
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={handleCheckStatus}
+                disabled={isCheckingStatus}
+                className="bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Activity className={`w-4 h-4 ${isCheckingStatus ? 'animate-pulse' : ''}`} />
+                {isCheckingStatus ? 'Verificando...' : 'Verificar Status'}
+              </button>
               <button
                 onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance })}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
@@ -449,7 +481,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 </div>
                 <h4 className="font-bold text-zinc-900 dark:text-white">Testar Conexão</h4>
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Envie uma mensagem de teste para verificar se as credenciais estão corretas.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Envie uma mensagem de teste para verificar se as credenciais estão corretas. Certifique-se de que a instância está <b>conectada</b> no painel da EvolutionAPI.</p>
               
               <div className="flex gap-3">
                 <input
