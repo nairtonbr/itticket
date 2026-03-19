@@ -123,11 +123,13 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   };
 
   const handleCheckStatus = async () => {
+    console.log('Iniciando verificação de status da instância...');
     setIsCheckingStatus(true);
     setMessage(null);
 
     try {
       const status = await checkInstanceStatus({ evolutionApiUrl, evolutionApiKey, evolutionInstance });
+      console.log('Status recebido:', status);
       const statusMap: Record<string, string> = {
         'open': 'Conectada (Online) ✅',
         'close': 'Desconectada (Offline) ❌',
@@ -139,6 +141,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
         text: `Status da Instância: ${statusMap[status] || status}` 
       });
     } catch (error: any) {
+      console.error('Erro ao verificar status:', error);
       setMessage({ type: "error", text: `Erro ao verificar status: ${error.message}` });
     } finally {
       setIsCheckingStatus(false);
@@ -392,19 +395,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               )}
             </div>
           </div>
-
-          {message && (
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className={`p-4 rounded-xl flex items-center gap-3 ${
-                message.type === "success" ? "bg-green-50 text-green-700 border border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50" : "bg-red-50 text-red-700 border border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50"
-              }`}
-            >
-              {message.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-              <span className="text-sm font-bold">{message.text}</span>
-            </motion.div>
-          )}
         </motion.div>
       )}
 
@@ -848,6 +838,21 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               </tbody>
             </table>
           </div>
+        </motion.div>
+      )}
+
+      {message && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`mt-6 p-4 rounded-2xl flex items-center gap-3 shadow-sm border ${
+            message.type === "success" 
+              ? "bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50" 
+              : "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50"
+          }`}
+        >
+          {message.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          <span className="text-sm font-bold">{message.text}</span>
         </motion.div>
       )}
     </div>
