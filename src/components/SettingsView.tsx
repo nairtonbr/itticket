@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon } from "lucide-react";
 import { AppSettings, ClientName, UserProfile, UserRole } from "../types";
 import { CLIENTS } from "../constants";
+import { testWhatsAppConnection } from "../utils/whatsappUtils";
+import { Send } from "lucide-react";
 
 interface SettingsViewProps {
   isAdmin: boolean;
@@ -37,6 +39,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<UserProfile>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [testNumber, setTestNumber] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
@@ -93,6 +97,28 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     const newPhones = { ...clientPhones, [client]: phone };
     setClientPhones(newPhones);
     onUpdateSettings({ clientPhones: newPhones });
+  };
+
+  const handleTestWhatsApp = async () => {
+    if (!testNumber) {
+      setMessage({ type: "error", text: "Por favor, insira um número ou ID de grupo para o teste." });
+      return;
+    }
+
+    setIsTesting(true);
+    setMessage(null);
+
+    try {
+      await testWhatsAppConnection(
+        { evolutionApiUrl, evolutionApiKey, evolutionInstance },
+        testNumber
+      );
+      setMessage({ type: "success", text: "Mensagem de teste enviada com sucesso! Verifique seu WhatsApp." });
+    } catch (error: any) {
+      setMessage({ type: "error", text: `Falha no teste: ${error.message}` });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const handleAddClient = () => {
@@ -414,6 +440,37 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 <Save className="w-4 h-4" />
                 Salvar Credenciais
               </button>
+            </div>
+
+            <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 rounded-lg">
+                  <Send className="w-5 h-5" />
+                </div>
+                <h4 className="font-bold text-zinc-900 dark:text-white">Testar Conexão</h4>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Envie uma mensagem de teste para verificar se as credenciais estão corretas.</p>
+              
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={testNumber}
+                  onChange={(e) => setTestNumber(e.target.value)}
+                  placeholder="Número (com DDD) ou ID do Grupo"
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white text-sm"
+                />
+                <button
+                  onClick={handleTestWhatsApp}
+                  disabled={isTesting}
+                  className={`px-6 py-2 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${
+                    isTesting 
+                      ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-400 cursor-not-allowed" 
+                      : "bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:opacity-90"
+                  }`}
+                >
+                  {isTesting ? "Testando..." : "Enviar Teste"}
+                </button>
+              </div>
             </div>
           </div>
 

@@ -62,3 +62,49 @@ export const sendWhatsAppNotification = async (
     console.error('Error sending WhatsApp notification:', error);
   }
 };
+
+export const testWhatsAppConnection = async (
+  settings: { evolutionApiUrl: string; evolutionApiKey: string; evolutionInstance: string },
+  target: string
+) => {
+  if (!settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance || !target) {
+    throw new Error("Configuração incompleta ou número de teste ausente.");
+  }
+
+  const isGroupId = target.includes('@g.us') || target.includes('-');
+  const formattedTarget = isGroupId ? target.trim() : target.replace(/\D/g, '');
+  
+  const message = `🧪 *TESTE DE CONEXÃO*\n\nSua integração com a EvolutionAPI está funcionando corretamente! 🚀`;
+
+  const url = `${settings.evolutionApiUrl}/message/sendText/${settings.evolutionInstance}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': settings.evolutionApiKey
+    },
+    body: JSON.stringify({
+      number: formattedTarget,
+      options: {
+        delay: 500,
+        presence: "composing",
+        linkPreview: false
+      },
+      textMessage: {
+        text: message
+      }
+    }),
+  });
+
+  if (!response.ok) {
+    try {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `Erro HTTP: ${response.status}`);
+    } catch (e) {
+      throw new Error(`Erro na requisição: ${response.status} ${response.statusText}`);
+    }
+  }
+  
+  return true;
+};
