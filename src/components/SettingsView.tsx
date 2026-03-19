@@ -21,9 +21,11 @@ interface SettingsViewProps {
 export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
+  const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
   const [evolutionApiUrl, setEvolutionApiUrl] = useState(settings.evolutionApiUrl || "");
   const [evolutionApiKey, setEvolutionApiKey] = useState(settings.evolutionApiKey || "");
   const [evolutionInstance, setEvolutionInstance] = useState(settings.evolutionInstance || "");
+  const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
   const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
@@ -45,9 +47,11 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
+    setWebhookEnabled(settings.webhookEnabled ?? true);
     setEvolutionApiUrl(settings.evolutionApiUrl || "");
     setEvolutionApiKey(settings.evolutionApiKey || "");
     setEvolutionInstance(settings.evolutionInstance || "");
+    setWhatsappEnabled(settings.whatsappEnabled ?? true);
     setClientPhones(settings.clientPhones || {});
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
@@ -58,7 +62,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const handleSaveGeneral = async () => {
     setMessage(null);
     try {
-      await onUpdateSettings({ webhookUrl });
+      await onUpdateSettings({ webhookUrl, webhookEnabled });
       setMessage({ type: "success", text: "Configurações salvas com sucesso!" });
     } catch (error) {
       setMessage({ type: "error", text: "Erro ao salvar configurações." });
@@ -315,11 +319,23 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
           className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6"
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
-                <Webhook className="w-5 h-5" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                  <Webhook className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Integração Webhook</h3>
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Integração Webhook</h3>
+              <button
+                onClick={() => setWebhookEnabled(!webhookEnabled)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  webhookEnabled 
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                    : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500"
+                }`}
+              >
+                {webhookEnabled ? "ATIVADO" : "DESATIVADO"}
+              </button>
             </div>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Configure a URL para envio de notificações ao n8n ou outros serviços.</p>
             <div className="flex gap-3">
@@ -426,11 +442,23 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
           className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-8"
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg">
-                <Globe className="w-5 h-5" />
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Integração EvolutionAPI</h3>
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Integração EvolutionAPI</h3>
+              <button
+                onClick={() => setWhatsappEnabled(!whatsappEnabled)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  whatsappEnabled 
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+                    : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500"
+                }`}
+              >
+                {whatsappEnabled ? "ATIVADO" : "DESATIVADO"}
+              </button>
             </div>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Configure sua instância da EvolutionAPI para enviar notificações diretas via WhatsApp.</p>
             
@@ -477,7 +505,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 {isCheckingStatus ? 'Verificando...' : 'Verificar Status'}
               </button>
               <button
-                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance })}
+                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance, whatsappEnabled })}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />

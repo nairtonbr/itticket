@@ -646,13 +646,25 @@ export default function App() {
         } : null);
       }
 
-      const updatedTicket = tickets.find(t => t.id === ticketId);
-      if (updatedTicket) {
+      const finalTicket = { ...originalTicket, ...formattedUpdates } as Ticket;
+      
+      if (settings.whatsappEnabled) {
+        const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
+        const isCommentAdded = updates.updates !== undefined && (updates.updates.length > (originalTicket?.updates?.length || 0));
+        
+        let whatsappType: 'status' | 'comment' | 'update' = "update";
+        if (isStatusChange) whatsappType = "status";
+        else if (isCommentAdded) whatsappType = "comment";
+
+        await sendWhatsAppNotification(finalTicket, settings, whatsappType);
+      }
+
+      if (settings.webhookUrl) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const webhookType = isStatusChange ? "action" : "update";
-        await sendWebhook({ ...updatedTicket, ...formattedUpdates }, settings, webhookType);
-        await sendWhatsAppNotification({ ...updatedTicket, ...formattedUpdates }, settings, webhookType);
+        await sendWebhook(finalTicket, settings, webhookType);
       }
+      
       toast.success("Chamado atualizado!");
     } catch (error) {
       console.error("Error updating ticket:", error);

@@ -59,6 +59,8 @@ export interface AppSettings {
   evolutionApiUrl?: string;
   evolutionApiKey?: string;
   evolutionInstance?: string;
+  whatsappEnabled?: boolean;
+  webhookEnabled?: boolean;
   clientPhones?: Record<string, string>; // ClientName -> Phone Number
 }
 

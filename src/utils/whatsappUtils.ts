@@ -3,8 +3,13 @@ import { Ticket, AppSettings } from "../types";
 export const sendWhatsAppNotification = async (
   ticket: Ticket, 
   settings: AppSettings, 
-  type: 'create' | 'update' | 'action' | 'sla_breach'
+  type: 'create' | 'update' | 'status' | 'comment' | 'sla_breach'
 ) => {
+  if (settings.whatsappEnabled === false) {
+    console.log("WhatsApp notification skipped: Disabled in settings.");
+    return;
+  }
+
   const clientPhone = settings.clientPhones?.[ticket.client];
   
   if (!clientPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
@@ -13,21 +18,63 @@ export const sendWhatsAppNotification = async (
   }
 
   // Format phone number or group ID
-  // If it contains @g.us or hyphens, assume it's a group ID/JID and don't strip
   const isGroupId = clientPhone.includes('@g.us') || clientPhone.includes('-');
   const formattedTarget = isGroupId ? clientPhone.trim() : clientPhone.replace(/\D/g, '');
   
-  // Format message based on user's image
-  let message = `🆔 *ID TICKET:* ${ticket.id}\n`;
-  message += `🔰 *Assunto:* ${ticket.title}\n`;
+  let message = "";
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "Resolvido":
+      case "Concluido":
+        return "✅";
+      default:
+        return "✴️";
+    }
+  };
+
+  const formatUpdates = (updates: any[], limit = 3) => {
+    if (!updates || updates.length === 0) return "";
+    const lastUpdates = updates.slice(-limit);
+    return lastUpdates.map((u, i) => {
+      const index = updates.length - lastUpdates.length + i + 1;
+      const label = index === 1 ? "Atualização" : `Atualização${index}`;
+      return `🔄 ${label}: ${u.content}`;
+    }).join("\n\n");
+  };
 
   if (type === 'create') {
-    message += `⏰ *Prazo para atualização:* ${ticket.sla}`;
+    message = `*NOVO TICKET ABERTO*\n`;
+    message += `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `${getStatusIcon(ticket.status)} Status: ${ticket.status}\n`;
+    message += `🔰 Assunto: ${ticket.title}\n`;
+    message += `⏰ Prazo para atualização: ${ticket.sla}`;
+  } else if (type === 'comment') {
+    message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `🔰 Assunto: ${ticket.title}\n`;
+    message += formatUpdates(ticket.updates);
+  } else if (type === 'status') {
+    message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `${getStatusIcon(ticket.status)} Status: ${ticket.status}\n`;
+    message += `🔰 Assunto: ${ticket.title}`;
+    
+    // For specific statuses, add updates
+    if (ticket.status === "Aguardando Cliente" || ticket.status === "Aguardando Terceiros") {
+      const updatesText = formatUpdates(ticket.updates);
+      if (updatesText) {
+        message += `\n${updatesText}`;
+      }
+    }
   } else if (type === 'sla_breach') {
-    message += `🚨 *ALERTA:* SLA Vencido!`;
+    message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `🔰 Assunto: ${ticket.title}\n`;
+    message += `🚨 ALERTA: SLA Vencido!`;
   } else {
+    // Fallback for generic update
+    message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `🔰 Assunto: ${ticket.title}\n`;
     const lastUpdate = ticket.updates?.[ticket.updates.length - 1]?.content || "Sem atualização";
-    message += `🔄 *Atualização:* ${lastUpdate}`;
+    message += `🔄 Atualização: ${lastUpdate}`;
   }
 
   // Normalize URL (remove trailing slash)
