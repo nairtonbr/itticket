@@ -240,6 +240,27 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
         </div>
       </div>
 
+      {message && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-4 rounded-2xl flex items-center gap-3 shadow-sm border ${
+            message.type === "success" 
+              ? "bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50" 
+              : "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50"
+          }`}
+        >
+          {message.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          <span className="text-sm font-bold">{message.text}</span>
+          <button 
+            onClick={() => setMessage(null)}
+            className="ml-auto p-1 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4 rotate-45" />
+          </button>
+        </motion.div>
+      )}
+
       <div className="flex gap-2 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl w-fit">
         <button
           onClick={() => setActiveTab("general")}
@@ -838,21 +859,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               </tbody>
             </table>
           </div>
-        </motion.div>
-      )}
-
-      {message && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`mt-6 p-4 rounded-2xl flex items-center gap-3 shadow-sm border ${
-            message.type === "success" 
-              ? "bg-green-50 text-green-700 border-green-100 dark:bg-green-900/20 dark:text-green-400 dark:border-green-900/50" 
-              : "bg-red-50 text-red-700 border-red-100 dark:bg-red-900/20 dark:text-red-400 dark:border-red-900/50"
-          }`}
-        >
-          {message.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-          <span className="text-sm font-bold">{message.text}</span>
         </motion.div>
       )}
     </div>

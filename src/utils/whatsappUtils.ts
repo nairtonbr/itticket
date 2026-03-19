@@ -44,13 +44,11 @@ export const sendWhatsAppNotification = async (
       },
       body: JSON.stringify({
         number: formattedTarget,
+        text: message,
         options: {
           delay: 1200,
           presence: "composing",
           linkPreview: false
-        },
-        textMessage: {
-          text: message
         }
       }),
     });
@@ -109,13 +107,11 @@ export const testWhatsAppConnection = async (
       },
       body: JSON.stringify({
         number: formattedTarget,
+        text: message,
         options: {
-          delay: 500,
+          delay: 1200,
           presence: "composing",
           linkPreview: false
-        },
-        textMessage: {
-          text: message
         }
       }),
     });
