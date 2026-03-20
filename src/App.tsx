@@ -479,8 +479,7 @@ export default function App() {
       await setDoc(doc(db, "settings", "global"), { ...settings, ...updates });
       toast.success("Configurações salvas!");
     } catch (error) {
-      console.error("Error updating settings:", error);
-      toast.error("Erro ao salvar configurações.");
+      handleFirestoreError(error, OperationType.WRITE, "settings/global");
     }
   };
 
@@ -504,8 +503,7 @@ export default function App() {
       await signOut(secondaryAuth);
       toast.success("Usuário criado com sucesso!");
     } catch (error: any) {
-      console.error("Error creating user:", error);
-      toast.error(`Erro ao criar usuário: ${error.message}`);
+      handleFirestoreError(error, OperationType.CREATE, `users/${email}`);
     }
   };
 
@@ -514,8 +512,7 @@ export default function App() {
       await setDoc(doc(db, "users", uid), data, { merge: true });
       toast.success("Usuário atualizado com sucesso!");
     } catch (error) {
-      console.error("Error updating user:", error);
-      toast.error("Erro ao atualizar usuário");
+      handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
     }
   };
 
@@ -524,8 +521,7 @@ export default function App() {
       await deleteDoc(doc(db, "users", uid));
       toast.success("Usuário removido do sistema!");
     } catch (error) {
-      console.error("Error deleting user:", error);
-      toast.error("Erro ao remover usuário");
+      handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
     }
   };
 
@@ -577,8 +573,7 @@ export default function App() {
       setIsModalOpen(false);
       toast.success("Chamado criado com sucesso!");
     } catch (error) {
-      console.error("Error creating ticket:", error);
-      toast.error("Erro ao criar chamado.");
+      handleFirestoreError(error, OperationType.CREATE, "tickets");
     }
   };
 
@@ -671,8 +666,7 @@ export default function App() {
       
       toast.success("Chamado atualizado!");
     } catch (error) {
-      console.error("Error updating ticket:", error);
-      toast.error("Erro ao atualizar chamado.");
+      handleFirestoreError(error, OperationType.UPDATE, `tickets/${ticketId}`);
     }
   };
 
@@ -682,8 +676,7 @@ export default function App() {
       toast.success("Chamado excluído com sucesso!");
       setIsModalOpen(false);
     } catch (error) {
-      console.error("Error deleting ticket:", error);
-      toast.error("Erro ao excluir chamado.");
+      handleFirestoreError(error, OperationType.DELETE, `tickets/${ticketId}`);
     }
   };
 
@@ -692,8 +685,7 @@ export default function App() {
       await addDoc(collection(db, "schedules"), scheduleData);
       toast.success("Escala agendada!");
     } catch (error) {
-      console.error("Error creating schedule:", error);
-      toast.error("Erro ao agendar escala.");
+      handleFirestoreError(error, OperationType.CREATE, "schedules");
     }
   };
 
@@ -702,8 +694,7 @@ export default function App() {
       await deleteDoc(doc(db, "schedules", id));
       toast.success("Escala removida!");
     } catch (error) {
-      console.error("Error deleting schedule:", error);
-      toast.error("Erro ao excluir escala.");
+      handleFirestoreError(error, OperationType.DELETE, `schedules/${id}`);
     }
   };
 
