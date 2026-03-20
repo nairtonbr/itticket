@@ -135,15 +135,15 @@ service cloud.firestore {
 
     match /tickets/{ticketId} {
       // Read: Admins and internal users see all. Clients see only their associated client tickets.
-      allow read: if isAdmin() || isUser() || (isClient() && resource.data.client == getAssociatedClient());
+      allow read: if isAdmin() || isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos"));
       
       // Create: Admins and users can create for any client. Clients can only create for themselves.
       allow create: if isAuthenticated() && 
-                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && request.resource.data.client == getAssociatedClient()))));
+                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (request.resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos")))));
       
       // Update: Admins can update anything. Users/Clients must follow schema and ownership.
       allow update: if isAuthenticated() && 
-                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && resource.data.client == getAssociatedClient()))));
+                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos")))));
       
       // Delete: Only admins
       allow delete: if isAdmin();

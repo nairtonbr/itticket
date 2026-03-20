@@ -319,7 +319,7 @@ export default function App() {
 
     // Tickets Subscription
     let ticketsQuery;
-    if (userProfile.role === 'admin' || userProfile.role === 'user') {
+    if (userProfile.role === 'admin' || userProfile.role === 'user' || userProfile.associatedClient === 'Todos') {
       ticketsQuery = query(
         collection(db, "tickets"),
         orderBy("createdAt", "desc")
@@ -707,11 +707,11 @@ export default function App() {
     }
   };
 
-  const ticketsByTab = activeTab === "dashboard" 
+  const ticketsByTab = activeTab === "dashboard" || (userProfile?.role === "client" && userProfile.associatedClient !== "Todos")
     ? tickets 
     : activeTab === "reports" || activeTab === "settings"
       ? []
-      : tickets.filter(t => t.client === activeTab);
+      : tickets.filter(t => t.client?.trim() === activeTab?.trim());
 
   const filteredTickets = React.useMemo(() => {
     const filtered = ticketsByTab.filter(t => {
@@ -775,7 +775,7 @@ export default function App() {
   const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
 
-  const visibleClients = userProfile?.role === "client" && userProfile.associatedClient
+  const visibleClients = userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos"
     ? [userProfile.associatedClient]
     : allClients;
 

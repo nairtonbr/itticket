@@ -85,7 +85,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       } else {
         setTitle("");
         setDescription("");
-        setClient(user?.role === "client" ? user.associatedClient : (activeClient || (allClients[0] || CLIENTS[0])));
+        setClient(user?.role === "client" && user.associatedClient !== "Todos" ? user.associatedClient : (activeClient || (allClients[0] || CLIENTS[0])));
         setStatus("Aberto");
         setCategory("");
         setPriority("");
@@ -136,7 +136,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     const data = {
       title,
       description,
-      client: user?.role === "client" ? user.associatedClient : client,
+      client: user?.role === "client" && user.associatedClient !== "Todos" ? user.associatedClient : client,
       status: ticket ? status : "Aberto",
       category: category || undefined,
       priority: priority || undefined,
@@ -356,7 +356,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <span className="w-24 text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">
                           Cliente <span className="text-red-500">*</span>:
                         </span>
-                        {user?.role === "client" ? (
+                        {user?.role === "client" && user.associatedClient !== "Todos" ? (
                           <div className="flex-1 px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm font-bold text-zinc-900 dark:text-white">
                             {user.associatedClient || client}
                           </div>
