@@ -500,6 +500,17 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
               </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Destinatário Alertas SLA (Opcional)</label>
+                <input
+                  type="text"
+                  value={slaAlertPhone}
+                  onChange={(e) => setSlaAlertPhone(e.target.value)}
+                  placeholder="Número ou ID do Grupo para alertas de SLA vencido"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                />
+                <p className="text-[10px] text-zinc-500 px-1">Se configurado, alertas de SLA serão enviados para este destino em vez do telefone do cliente.</p>
+              </div>
             </div>
             
             <div className="flex justify-end gap-3 pt-2">
@@ -512,7 +523,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 {isCheckingStatus ? 'Verificando...' : 'Verificar Status'}
               </button>
               <button
-                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance, whatsappEnabled })}
+                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance, whatsappEnabled, slaAlertPhone })}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />

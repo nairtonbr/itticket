@@ -1314,7 +1314,7 @@ export default function App() {
                           className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs font-bold text-zinc-600 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                         >
                           <option value="Todos">Todos Clientes</option>
-                          {allClients.map(c => <option key={c} value={c}>{c}</option>)}
+                          {visibleClients.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
 
                         <select 
@@ -1476,7 +1476,7 @@ export default function App() {
             user={userProfile}
             activeClient={activeTab !== "dashboard" && activeTab !== "reports" && activeTab !== "settings" ? activeTab : undefined}
             clientResponsibles={settings.clientResponsibles}
-            allClients={allClients}
+            allClients={visibleClients}
             allCategories={allCategories}
           />
         )}
