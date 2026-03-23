@@ -6,6 +6,12 @@ export { getTicketSlaStatus };
 export const sendWebhook = async (ticket: Ticket, settings: AppSettings, type: 'create' | 'update' | 'sla_breach' | 'action') => {
   if (settings.webhookEnabled === false || !settings.webhookUrl) return;
 
+  // Extra safety: Skip SLA alerts if disabled in settings
+  if (type === 'sla_breach' && settings.slaAlertsEnabled === false) {
+    console.log("SLA breach webhook skipped: Disabled in settings.");
+    return;
+  }
+
   try {
     const response = await fetch('/api/webhook-proxy', {
       method: 'POST',

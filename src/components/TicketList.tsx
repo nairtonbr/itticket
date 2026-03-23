@@ -3,7 +3,7 @@ import { Ticket } from "../types";
 import { STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_DESCRIPTIONS } from "../constants";
 import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip, AlertCircle, Star } from "lucide-react";
 import { formatFirestoreDate } from "../utils/dateUtils";
-import { getTicketSlaStatus } from "../utils/slaUtils";
+import { getTicketSlaStatus, formatSlaDisplay } from "../utils/slaUtils";
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -149,7 +149,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                         ? "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800" 
                         : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800"
                     }`}>
-                      {ticket.sla || "-"}
+                      {formatSlaDisplay(ticket.sla)}
                     </span>
                   </div>
 

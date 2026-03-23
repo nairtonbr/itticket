@@ -6,7 +6,7 @@ import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { getFirestoreDate } from "../utils/dateUtils";
-import { getTicketSlaStatus, getSlaProgress } from "../utils/slaUtils";
+import { getTicketSlaStatus, getSlaProgress, formatSlaDisplay } from "../utils/slaUtils";
 
 interface KanbanBoardProps {
   tickets: Ticket[];
@@ -135,7 +135,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
                 <div className="mt-3 space-y-1.5">
                   <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
                     <span className={isExpired || isApproaching ? "text-red-500" : "text-zinc-400"}>SLA</span>
-                    <span className={isExpired || isApproaching ? "text-red-600 dark:text-red-400 font-black" : "text-blue-600 dark:text-blue-400"}>{ticket.sla}</span>
+                    <span className={isExpired || isApproaching ? "text-red-600 dark:text-red-400 font-black" : "text-blue-600 dark:text-blue-400"}>{formatSlaDisplay(ticket.sla)}</span>
                   </div>
                   <div className={`w-full h-1 rounded-full overflow-hidden ${isExpired ? "bg-red-100 dark:bg-red-900/20" : "bg-zinc-100 dark:bg-zinc-800"}`}>
                     <motion.div 

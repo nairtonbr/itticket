@@ -4,6 +4,7 @@ import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSqu
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
+import { parseSlaToMs } from "../utils/slaUtils";
 
 interface TicketModalProps {
   isOpen: boolean;
@@ -78,7 +79,33 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setCategory(ticket.category || "");
         setPriority(ticket.priority || "");
         setResponsible(ticket.responsible || "");
-        setSla(ticket.sla || "");
+        
+        let initialSla = ticket.sla || "";
+        if (initialSla && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(initialSla)) {
+          // Convert legacy format (e.g., "24h") to datetime-local format
+          const slaMs = parseSlaToMs(initialSla);
+          if (slaMs > 0 && ticket.createdAt) {
+            let createdAtMs = 0;
+            if (typeof ticket.createdAt.toDate === 'function') {
+              createdAtMs = ticket.createdAt.toDate().getTime();
+            } else if (ticket.createdAt instanceof Date) {
+              createdAtMs = ticket.createdAt.getTime();
+            } else if (typeof ticket.createdAt === 'number') {
+              createdAtMs = ticket.createdAt;
+            } else if (typeof ticket.createdAt === 'string') {
+              createdAtMs = new Date(ticket.createdAt).getTime();
+            }
+            
+            if (createdAtMs > 0) {
+              const deadline = new Date(createdAtMs + slaMs);
+              // Format to YYYY-MM-DDThh:mm
+              const pad = (n: number) => n.toString().padStart(2, '0');
+              initialSla = `${deadline.getFullYear()}-${pad(deadline.getMonth() + 1)}-${pad(deadline.getDate())}T${pad(deadline.getHours())}:${pad(deadline.getMinutes())}`;
+            }
+          }
+        }
+        setSla(initialSla);
+        
         setIsImportant(ticket.isImportant || false);
         setTotalHours(ticket.totalHours || 0);
         setAttachments(ticket.attachments || []);
@@ -423,13 +450,12 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         </span>
                         <div className="flex-1">
                           <input 
-                            type="text" 
+                            type="datetime-local" 
                             value={sla}
                             onChange={(e) => {
                               setSla(e.target.value);
                               if (errors.sla) setErrors(prev => ({ ...prev, sla: "" }));
                             }}
-                            placeholder="Ex: 4h, 24h"
                             className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600 ${
                               errors.sla ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
                             }`}

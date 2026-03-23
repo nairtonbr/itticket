@@ -52,7 +52,8 @@ db.exec(`
     clientLogos TEXT,
     clientResponsibles TEXT,
     customClients TEXT,
-    customCategories TEXT
+    customCategories TEXT,
+    responsiblePhones TEXT
   );
 
   CREATE TABLE IF NOT EXISTS schedules (
@@ -101,6 +102,10 @@ if (!settingsColumns.includes("customClients")) {
 if (!settingsColumns.includes("customCategories")) {
   db.exec("ALTER TABLE settings ADD COLUMN customCategories TEXT");
   console.log("Migration: Added customCategories column to settings table.");
+}
+if (!settingsColumns.includes("responsiblePhones")) {
+  db.exec("ALTER TABLE settings ADD COLUMN responsiblePhones TEXT");
+  console.log("Migration: Added responsiblePhones column to settings table.");
 }
 
 // Migration for schedules table
@@ -384,21 +389,23 @@ async function startServer() {
       clientLogos: JSON.parse(settings.clientLogos || "{}"),
       clientResponsibles: JSON.parse(settings.clientResponsibles || "{}"),
       customClients: JSON.parse(settings.customClients || "[]"),
-      customCategories: JSON.parse(settings.customCategories || "[]")
+      customCategories: JSON.parse(settings.customCategories || "[]"),
+      responsiblePhones: JSON.parse(settings.responsiblePhones || "{}")
     });
   });
 
   app.post("/api/settings", authenticateToken, (req, res) => {
     const settings = req.body;
     db.prepare(`
-      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles, customClients, customCategories)
-      VALUES ('global', ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO settings (id, webhookUrl, clientLogos, clientResponsibles, customClients, customCategories, responsiblePhones)
+      VALUES ('global', ?, ?, ?, ?, ?, ?)
     `).run(
       settings.webhookUrl || "",
       JSON.stringify(settings.clientLogos || {}),
       JSON.stringify(settings.clientResponsibles || {}),
       JSON.stringify(settings.customClients || []),
-      JSON.stringify(settings.customCategories || [])
+      JSON.stringify(settings.customCategories || []),
+      JSON.stringify(settings.responsiblePhones || {})
     );
     res.json({ message: "Configurações salvas" });
   });
@@ -459,7 +466,9 @@ async function startServer() {
       }
 
       if (!response.ok) {
-        console.error(`Target returned error: ${response.status}`, responseData);
+        if (response.status !== 400 && response.status !== 404) {
+          console.error(`Target returned error: ${response.status}`, responseData);
+        }
         return res.status(response.status).json({ error: responseData });
       }
 

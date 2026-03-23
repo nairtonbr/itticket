@@ -14,6 +14,9 @@ export const getFirestoreDate = (date: any): Date | null => {
       dateObj = new Date(date);
     } else if (date && typeof date === 'object' && 'seconds' in date) {
       dateObj = new Date((date as any).seconds * 1000);
+    } else if (date && typeof date === 'object' && (date.constructor?.name === 'FieldValue' || !('seconds' in date))) {
+      // Handle pending serverTimestamp or other FieldValues by using current time
+      dateObj = new Date();
     } else if (typeof date === 'string') {
       dateObj = new Date(date);
     } else {

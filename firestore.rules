@@ -117,6 +117,11 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    function areSlaAlertsEnabled() {
+      let settings = get(/databases/$(database)/documents/settings/global);
+      return settings != null && settings.data.slaAlertsEnabled == true;
+    }
+
     match /users/{userId} {
       // Users can only read their own profile (PII protection)
       // Admins can read all profiles
@@ -142,8 +147,10 @@ service cloud.firestore {
                     (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (request.resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos")))));
       
       // Update: Admins can update anything. Users/Clients must follow schema and ownership.
+      // CRITICAL: Block lastSlaNotification updates if SLA alerts are disabled in settings
       allow update: if isAuthenticated() && 
-                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos")))));
+                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos"))))) &&
+                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastSlaNotification']) || areSlaAlertsEnabled());
       
       // Delete: Only admins
       allow delete: if isAdmin();

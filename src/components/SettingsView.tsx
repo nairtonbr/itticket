@@ -28,6 +28,9 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
   const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
   const [slaAlertPhone, setSlaAlertPhone] = useState(settings.slaAlertPhone || "");
+  const [slaAlertsEnabled, setSlaAlertsEnabled] = useState(settings.slaAlertsEnabled ?? false);
+  const [disabledSlaClients, setDisabledSlaClients] = useState<string[]>(settings.disabledSlaClients || []);
+  const [responsiblePhones, setResponsiblePhones] = useState<Record<string, string>>(settings.responsiblePhones || {});
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
   const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
@@ -45,6 +48,14 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [testNumber, setTestNumber] = useState("");
   const [isTesting, setIsTesting] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  
+  const allResponsibles = React.useMemo(() => {
+    const all = new Set<string>();
+    Object.values(clientResponsibles).forEach(names => {
+      names.forEach(name => all.add(name));
+    });
+    return Array.from(all).sort();
+  }, [clientResponsibles]);
 
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
@@ -55,6 +66,9 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setWhatsappEnabled(settings.whatsappEnabled ?? true);
     setClientPhones(settings.clientPhones || {});
     setSlaAlertPhone(settings.slaAlertPhone || "");
+    setSlaAlertsEnabled(settings.slaAlertsEnabled ?? true);
+    setDisabledSlaClients(settings.disabledSlaClients || []);
+    setResponsiblePhones(settings.responsiblePhones || {});
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
@@ -103,12 +117,40 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const handleUpdatePhone = (client: string, phone: string) => {
     const newPhones = { ...clientPhones, [client]: phone };
     setClientPhones(newPhones);
-    onUpdateSettings({ clientPhones: newPhones });
+  };
+
+  const handleSavePhone = (client: string) => {
+    onUpdateSettings({ clientPhones: { ...settings.clientPhones, [client]: clientPhones[client] || "" } });
+  };
+
+  const handleUpdateResponsiblePhone = (responsible: string, phone: string) => {
+    const newPhones = { ...responsiblePhones, [responsible]: phone };
+    setResponsiblePhones(newPhones);
+  };
+
+  const handleSaveResponsiblePhone = (responsible: string) => {
+    onUpdateSettings({ responsiblePhones: { ...settings.responsiblePhones, [responsible]: responsiblePhones[responsible] || "" } });
   };
 
   const handleUpdateSlaPhone = (phone: string) => {
     setSlaAlertPhone(phone);
-    onUpdateSettings({ slaAlertPhone: phone });
+  };
+
+  const handleSaveSlaPhone = () => {
+    onUpdateSettings({ slaAlertPhone: slaAlertPhone });
+  };
+
+  const handleToggleSlaAlerts = (enabled: boolean) => {
+    setSlaAlertsEnabled(enabled);
+    onUpdateSettings({ slaAlertsEnabled: enabled });
+  };
+
+  const handleToggleClientSla = (client: string) => {
+    const newDisabled = disabledSlaClients.includes(client)
+      ? disabledSlaClients.filter(c => c !== client)
+      : [...disabledSlaClients, client];
+    setDisabledSlaClients(newDisabled);
+    onUpdateSettings({ disabledSlaClients: newDisabled });
   };
 
   const handleTestWhatsApp = async () => {
@@ -173,11 +215,9 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   };
 
   const handleRemoveClient = (client: string) => {
-    if (confirm(`Tem certeza que deseja excluir o cliente ${client}? Isso não excluirá os chamados dele.`)) {
-      const newCustom = customClients.filter(c => c !== client);
-      setCustomClients(newCustom);
-      onUpdateSettings({ customClients: newCustom });
-    }
+    const newCustom = customClients.filter(c => c !== client);
+    setCustomClients(newCustom);
+    onUpdateSettings({ customClients: newCustom });
   };
 
   const handleAddCategory = () => {
@@ -190,11 +230,9 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   };
 
   const handleRemoveCategory = (category: string) => {
-    if (confirm(`Tem certeza que deseja excluir a categoria ${category}?`)) {
-      const newCustom = customCategories.filter(c => c !== category);
-      setCustomCategories(newCustom);
-      onUpdateSettings({ customCategories: newCustom });
-    }
+    const newCustom = customCategories.filter(c => c !== category);
+    setCustomCategories(newCustom);
+    onUpdateSettings({ customCategories: newCustom });
   };
 
   const handleCreateUser = async () => {
@@ -223,12 +261,10 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   };
 
   const handleDeleteUser = async (uid: string) => {
-    if (confirm("Tem certeza que deseja excluir este usuário?")) {
-      try {
-        await onDeleteUser(uid);
-      } catch (error) {
-        console.error("Error deleting user:", error);
-      }
+    try {
+      await onDeleteUser(uid);
+    } catch (error) {
+      console.error("Error deleting user:", error);
     }
   };
 
@@ -479,6 +515,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   placeholder="https://api.sua-instancia.com"
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
+                <p className="text-[10px] text-zinc-500 px-1 mt-1">Ex: https://api.whatsapp.com (sem a barra no final)</p>
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Nome da Instância</label>
@@ -489,6 +526,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   placeholder="Ex: Suporte"
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
+                <p className="text-[10px] text-zinc-500 px-1 mt-1">O nome da instância criada no painel EvolutionAPI.</p>
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">API Key Global</label>
@@ -573,33 +611,95 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe um número de WhatsApp ou ID de Grupo (JID) a cada cliente.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[...CLIENTS, ...customClients].sort().map((client) => (
-                <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{client}</span>
+              {[...CLIENTS, ...customClients].sort().map((client) => {
+                const isDisabled = disabledSlaClients.includes(client);
+                return (
+                  <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2 relative">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{client}</span>
+                      <button
+                        onClick={() => handleToggleClientSla(client)}
+                        title={isDisabled ? "Clique para ativar alertas de SLA para este cliente" : "Clique para desativar alertas de SLA para este cliente"}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                          !isDisabled 
+                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50" 
+                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                        }`}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full ${!isDisabled ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+                        {isDisabled ? "NOTIFICAÇÕES DESATIVADAS" : "NOTIFICAÇÕES ATIVADAS"}
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={clientPhones[client] || ""}
+                      onChange={(e) => handleUpdatePhone(client, e.target.value)}
+                      onBlur={() => handleSavePhone(client)}
+                      placeholder="Ex: 5511999999999 ou 123456789@g.us"
+                      className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    value={clientPhones[client] || ""}
-                    onChange={(e) => handleUpdatePhone(client, e.target.value)}
-                    placeholder="Ex: 5511999999999 ou 123456789@g.us"
-                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
-                  />
-                </div>
-              ))}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-2">
+                );
+              })}
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-2 relative">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold text-blue-700 dark:text-blue-400">Destinatário Alertas SLA</span>
-                  <AlertCircle className="w-4 h-4 text-blue-500" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-blue-700 dark:text-blue-400">Destinatário Alertas SLA</span>
+                    <AlertCircle className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <button
+                    onClick={() => handleToggleSlaAlerts(!slaAlertsEnabled)}
+                    title={slaAlertsEnabled ? "Clique para desativar TODOS os alertas de SLA" : "Clique para ativar os alertas de SLA"}
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                      slaAlertsEnabled 
+                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50" 
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                    }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${slaAlertsEnabled ? "bg-blue-500 animate-pulse" : "bg-red-500"}`} />
+                    {slaAlertsEnabled ? "GERAL ATIVADO" : "GERAL DESATIVADO"}
+                  </button>
                 </div>
                 <input
                   type="text"
                   value={slaAlertPhone}
                   onChange={(e) => handleUpdateSlaPhone(e.target.value)}
+                  onBlur={handleSaveSlaPhone}
                   placeholder="Ex: 5511999999999 ou 123456789@g.us"
                   className="w-full bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
                 />
               </div>
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <User className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">WhatsApp por Responsável</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe um número de WhatsApp a cada responsável. Alertas de SLA serão enviados individualmente se configurado.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allResponsibles.map((responsible) => (
+                <div key={responsible} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2 relative">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{responsible}</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={responsiblePhones[responsible] || ""}
+                    onChange={(e) => handleUpdateResponsiblePhone(responsible, e.target.value)}
+                    onBlur={() => handleSaveResponsiblePhone(responsible)}
+                    placeholder="Ex: 5511999999999"
+                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                  />
+                </div>
+              ))}
+              {allResponsibles.length === 0 && (
+                <p className="text-sm text-zinc-400 italic col-span-2">Nenhum responsável cadastrado nos clientes.</p>
+              )}
             </div>
           </div>
         </motion.div>

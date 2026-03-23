@@ -12,9 +12,33 @@ export const sendWhatsAppNotification = async (
 
   const clientPhone = settings.clientPhones?.[ticket.client];
   const slaPhone = settings.slaAlertPhone;
+  const responsiblePhone = ticket.responsible ? settings.responsiblePhones?.[ticket.responsible] : null;
   
-  // Use dedicated SLA alert phone if available for SLA breach, otherwise use client phone
-  const targetPhone = (type === 'sla_breach' && slaPhone) ? slaPhone : clientPhone;
+  // Extra safety: Skip SLA alerts if disabled in settings
+  if (type === 'sla_breach') {
+    if (settings.slaAlertsEnabled === false) {
+      console.log("SLA breach notification skipped: Disabled in settings.");
+      return;
+    }
+    
+    const status = (ticket.status || "").toLowerCase().trim();
+    if (status === "resolvido" || 
+        status === "concluido" ||
+        status === "finalizado" ||
+        status === "aguardando cliente" || 
+        status === "aguardando terceiros") {
+      console.log("SLA breach notification skipped: Ticket is resolved or waiting.");
+      return;
+    }
+  }
+  
+  // Priority for SLA breach:
+  // 1. Responsible's phone (if configured)
+  // 2. Dedicated SLA alert phone
+  // 3. Client's phone
+  const targetPhone = type === 'sla_breach' 
+    ? (responsiblePhone || slaPhone || clientPhone)
+    : clientPhone;
   
   if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
     console.log("WhatsApp notification skipped: Missing configuration or target phone.");
@@ -91,7 +115,7 @@ export const sendWhatsAppNotification = async (
   const baseUrl = settings.evolutionApiUrl.replace(/\/$/, '');
   
   try {
-    const url = `${baseUrl}/message/sendText/${settings.evolutionInstance}`;
+    const url = `${baseUrl}/message/sendText/${encodeURIComponent(settings.evolutionInstance)}`;
     
     const response = await fetch('/api/webhook-proxy', {
       method: 'POST',
@@ -118,12 +142,22 @@ export const sendWhatsAppNotification = async (
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('EvolutionAPI Proxy Error:', errorData.error);
+      const apiError = errorData.error || errorData;
+      
+      let errorMessage = "Erro ao enviar WhatsApp";
+      if (response.status === 400 && JSON.stringify(apiError).includes('Connection Closed')) {
+        errorMessage = "WhatsApp desconectado. Reconecte na EvolutionAPI.";
+      } else if (response.status === 404) {
+        errorMessage = "Instância do WhatsApp não encontrada.";
+      }
+      
+      return { success: false, error: errorMessage };
     } else {
       console.log('WhatsApp notification sent successfully.');
+      return { success: true };
     }
-  } catch (error) {
-    console.error('Error sending WhatsApp notification through proxy:', error);
+  } catch (error: any) {
+    return { success: false, error: error.message };
   }
 };
 
@@ -152,7 +186,7 @@ export const testWhatsAppConnection = async (
   
   const message = `🧪 *TESTE DE CONEXÃO*\n\nSua integração com a EvolutionAPI está funcionando corretamente! 🚀\n\n_Enviado em: ${new Date().toLocaleString('pt-BR')}_`;
 
-  const url = `${baseUrl}/message/sendText/${settings.evolutionInstance}`;
+  const url = `${baseUrl}/message/sendText/${encodeURIComponent(settings.evolutionInstance)}`;
   
   console.log('Iniciando teste de WhatsApp...', { url, target: formattedTarget });
 
@@ -185,9 +219,16 @@ export const testWhatsAppConnection = async (
       try {
         const errorData = await response.json();
         const apiError = errorData.error || errorData;
-        console.error('EvolutionAPI Error Response:', apiError);
         
-        if (apiError.message) {
+        // Specific handling for common EvolutionAPI errors
+        if (response.status === 400 && JSON.stringify(apiError).includes('Connection Closed')) {
+          errorMessage = "Instância Desconectada: A sessão do WhatsApp foi encerrada ou não está aberta. Por favor, reconecte no painel da EvolutionAPI.";
+        } else if (response.status === 404) {
+          errorMessage = "Não Encontrado (404): Verifique se a URL da API e o Nome da Instância estão corretos.";
+        } else if (apiError.response?.message) {
+          const msg = apiError.response.message;
+          errorMessage = Array.isArray(msg) ? msg.join(', ') : msg;
+        } else if (apiError.message) {
           if (Array.isArray(apiError.message)) {
             errorMessage = apiError.message.join(', ');
           } else {
@@ -238,6 +279,15 @@ export const checkInstanceStatus = async (
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("Não Encontrado (404): Verifique se a URL da API e o Nome da Instância estão corretos.");
+      }
+      if (response.status === 400) {
+        const errorData = await response.json();
+        if (JSON.stringify(errorData).includes('Connection Closed')) {
+          throw new Error("Instância Desconectada: A sessão do WhatsApp foi encerrada ou não está aberta.");
+        }
+      }
       throw new Error(`Erro HTTP: ${response.status}`);
     }
 

@@ -87,7 +87,8 @@ export default function App() {
     clientLogos: {},
     clientResponsibles: {},
     whatsappEnabled: true,
-    webhookEnabled: true
+    webhookEnabled: true,
+    responsiblePhones: {}
   });
   const [schedules, setSchedules] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -165,6 +166,13 @@ export default function App() {
       
       if (!currentTickets.length || !currentSettings) return;
 
+      // Skip if global SLA alerts are disabled (Default to false for safety now)
+      // Added extra check for window.SLA_MONITOR_DISABLED as a kill-switch
+      if (currentSettings.slaAlertsEnabled !== true || (window as any).SLA_MONITOR_DISABLED) {
+        console.log("[SLA Monitor] SLA alerts are currently disabled in settings or by kill-switch.");
+        return;
+      }
+
       lastCheckTime = now;
       console.log(`[SLA Monitor] Starting check for ${currentTickets.length} tickets...`);
       
@@ -172,12 +180,18 @@ export default function App() {
       const expiredTickets = currentTickets.filter(ticket => {
         if (notifiedInSession.has(ticket.id)) return false;
 
-        if (ticket.status === "Resolvido" || 
-            ticket.status === "Aguardando Cliente" || 
-            ticket.status === "Aguardando Terceiros") return false;
+        // Skip if SLA alerts are disabled for this specific client
+        if (currentSettings.disabledSlaClients?.includes(ticket.client)) return false;
+
+        const status = (ticket.status || "").toLowerCase().trim();
+        if (status === "resolvido" || 
+            status === "concluido" ||
+            status === "finalizado" ||
+            status === "aguardando cliente" || 
+            status === "aguardando terceiros") return false;
             
-        const status = getTicketSlaStatus(ticket);
-        if (status !== "expired") return false;
+        const slaStatus = getTicketSlaStatus(ticket);
+        if (slaStatus !== "expired") return false;
 
         const lastNotifyDate = getFirestoreDate(ticket.lastSlaNotification);
         const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
@@ -204,16 +218,20 @@ export default function App() {
             if (!ticketDoc.exists()) return;
             
             const data = ticketDoc.data();
+            const status = (data.status || "").toLowerCase().trim();
+            
+            // Re-verify status inside transaction
+            if (status === "resolvido" || 
+                status === "concluido" ||
+                status === "finalizado" ||
+                status === "aguardando cliente" || 
+                status === "aguardando terceiros") {
+              throw "Ticket status changed to resolved or waiting, skipping SLA alert";
+            }
+
             const lastNotifyDate = getFirestoreDate(data.lastSlaNotification);
             const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
             const fourHoursMs = 4 * 60 * 60 * 1000;
-            
-            // Re-verify status inside transaction
-            if (data.status === "Resolvido" || 
-                data.status === "Aguardando Cliente" || 
-                data.status === "Aguardando Terceiros") {
-              throw "Ticket status changed, skipping SLA alert";
-            }
 
             if (lastNotify === 0 || (Date.now() - lastNotify) >= fourHoursMs) {
               transaction.update(ticketRef, {
@@ -231,10 +249,11 @@ export default function App() {
           });
           
           // If we reached here, the transaction succeeded
-          await Promise.all([
-            sendWebhook(ticket, currentSettings, "sla_breach"),
-            sendWhatsAppNotification(ticket, currentSettings, "sla_breach")
-          ]);
+          await sendWebhook(ticket, currentSettings, "sla_breach");
+          const waResult = await sendWhatsAppNotification(ticket, currentSettings, "sla_breach");
+          if (waResult && !waResult.success) {
+            console.warn(`[SLA Monitor] WhatsApp notification failed for ticket ${ticket.id}: ${waResult.error}`);
+          }
           
           console.log(`[SLA Monitor] SUCCESS: Notifications sent for ticket ${ticket.id}`);
           
@@ -445,7 +464,18 @@ export default function App() {
     // Settings Subscription
     const unsubSettings = onSnapshot(doc(db, "settings", "global"), (doc) => {
       if (doc.exists()) {
-        setSettings(doc.data() as AppSettings);
+        const data = doc.data();
+        setSettings(prev => ({ 
+          ...prev, 
+          ...data,
+          responsiblePhones: data.responsiblePhones || {},
+          clientPhones: data.clientPhones || {},
+          clientLogos: data.clientLogos || {},
+          clientResponsibles: data.clientResponsibles || {},
+          customClients: data.customClients || [],
+          customCategories: data.customCategories || [],
+          disabledSlaClients: data.disabledSlaClients || []
+        }));
       }
     }, (error) => handleFirestoreError(error, OperationType.GET, "settings/global"));
 
@@ -578,7 +608,7 @@ export default function App() {
 
   const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
     try {
-      await setDoc(doc(db, "settings", "global"), { ...settings, ...updates });
+      await updateDoc(doc(db, "settings", "global"), updates);
       toast.success("Configurações salvas!");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, "settings/global");
@@ -682,9 +712,15 @@ export default function App() {
       await setDoc(doc(db, "tickets", ticketId), formattedData);
       
       await sendWebhook(formattedData as Ticket, settings, "create");
-      await sendWhatsAppNotification(formattedData as Ticket, settings, "create");
+      const waResult = await sendWhatsAppNotification(formattedData as Ticket, settings, "create");
+      
       setIsModalOpen(false);
-      toast.success("Chamado criado com sucesso!");
+      
+      if (waResult && !waResult.success) {
+        toast.success("Chamado criado, mas falha no WhatsApp: " + waResult.error);
+      } else {
+        toast.success("Chamado criado com sucesso!");
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "tickets");
     }
@@ -760,6 +796,7 @@ export default function App() {
 
       const finalTicket = { ...originalTicket, ...formattedUpdates } as Ticket;
       
+      let waError = null;
       if (settings.whatsappEnabled !== false) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const isCommentAdded = updates.updates !== undefined && (updates.updates.length > (originalTicket?.updates?.length || 0));
@@ -769,7 +806,10 @@ export default function App() {
         else if (isCommentAdded) whatsappType = "comment";
 
         console.log(`Sending WhatsApp notification: ${whatsappType}`, { isStatusChange, isCommentAdded });
-        await sendWhatsAppNotification(finalTicket, settings, whatsappType);
+        const waResult = await sendWhatsAppNotification(finalTicket, settings, whatsappType);
+        if (waResult && !waResult.success) {
+          waError = waResult.error;
+        }
       }
 
       if (settings.webhookEnabled !== false && settings.webhookUrl) {
@@ -778,7 +818,11 @@ export default function App() {
         await sendWebhook(finalTicket, settings, webhookType);
       }
       
-      toast.success("Chamado atualizado!");
+      if (waError) {
+        toast.success(`Chamado atualizado, mas falha no WhatsApp: ${waError}`, { duration: 5000 });
+      } else {
+        toast.success("Chamado atualizado!");
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `tickets/${ticketId}`);
     }

@@ -44,11 +44,34 @@ export const parseSlaToMs = (sla: string): number => {
   return 0;
 };
 
+export const formatSlaDisplay = (sla: string): string => {
+  if (!sla) return "-";
+  
+  const isDateString = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(sla);
+  if (isDateString) {
+    try {
+      const date = new Date(sla);
+      const day = date.getDate().toString().padStart(2, '0');
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${day}/${month} ${hours}:${minutes}`;
+    } catch (e) {
+      return sla;
+    }
+  }
+  
+  return sla;
+};
+
 export const getTicketSlaStatus = (ticket: Ticket): SlaStatus => {
+  const status = (ticket.status || "").toLowerCase().trim();
   if (!ticket.createdAt || !ticket.sla || 
-      ticket.status === "Resolvido" || 
-      ticket.status === "Aguardando Cliente" || 
-      ticket.status === "Aguardando Terceiros") return "normal";
+      status === "resolvido" || 
+      status === "concluido" ||
+      status === "finalizado" ||
+      status === "aguardando cliente" || 
+      status === "aguardando terceiros") return "normal";
 
   let createdAtMs: number = 0;
   try {
@@ -70,10 +93,27 @@ export const getTicketSlaStatus = (ticket: Ticket): SlaStatus => {
   
   if (!createdAtMs || isNaN(createdAtMs)) return "normal";
 
+  const now = Date.now();
+  
+  // Check if SLA is an ISO date string (e.g., "2026-03-24T14:22")
+  const isDateString = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ticket.sla);
+  
+  if (isDateString) {
+    const deadlineMs = new Date(ticket.sla).getTime();
+    if (isNaN(deadlineMs)) return "normal";
+    
+    const remaining = deadlineMs - now;
+    if (remaining <= 0) return "expired";
+    
+    const totalDuration = deadlineMs - createdAtMs;
+    if (totalDuration > 0 && remaining <= totalDuration * 0.2) return "approaching";
+    
+    return "normal";
+  }
+
   const slaMs = parseSlaToMs(ticket.sla);
   if (slaMs === 0) return "normal";
 
-  const now = Date.now();
   const elapsed = now - createdAtMs;
   const remaining = slaMs - elapsed;
 
@@ -109,12 +149,26 @@ export const getSlaProgress = (ticket: Ticket): number => {
 
   if (!createdAtMs || isNaN(createdAtMs)) return 0;
 
+  const now = Date.now();
+  
+  const isDateString = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ticket.sla);
+  if (isDateString) {
+    const deadlineMs = new Date(ticket.sla).getTime();
+    if (isNaN(deadlineMs)) return 0;
+    
+    const totalDuration = deadlineMs - createdAtMs;
+    if (totalDuration <= 0) return 100;
+    
+    const elapsed = now - createdAtMs;
+    const progress = (elapsed / totalDuration) * 100;
+    return Math.min(Math.max(progress, 0), 100);
+  }
+
   const slaMs = parseSlaToMs(ticket.sla);
   if (slaMs === 0) return 0;
 
-  const now = Date.now();
   const elapsed = now - createdAtMs;
   
   const progress = (elapsed / slaMs) * 100;
-  return Math.min(progress, 100);
+  return Math.min(Math.max(progress, 0), 100);
 };
