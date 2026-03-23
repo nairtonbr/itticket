@@ -93,36 +93,37 @@ export const sendWhatsAppNotification = async (
   try {
     const url = `${baseUrl}/message/sendText/${settings.evolutionInstance}`;
     
-    const response = await fetch(url, {
+    const response = await fetch('/api/webhook-proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': settings.evolutionApiKey
       },
       body: JSON.stringify({
-        number: formattedTarget,
-        text: message,
-        options: {
-          delay: 1200,
-          presence: "composing",
-          linkPreview: false
+        url,
+        method: 'POST',
+        headers: {
+          'apikey': settings.evolutionApiKey
+        },
+        data: {
+          number: formattedTarget,
+          text: message,
+          options: {
+            delay: 1200,
+            presence: "composing",
+            linkPreview: false
+          }
         }
       }),
     });
 
     if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        console.error('EvolutionAPI Error:', errorData);
-      } catch (e) {
-        const textError = await response.text();
-        console.error('EvolutionAPI Text Error:', textError);
-      }
+      const errorData = await response.json();
+      console.error('EvolutionAPI Proxy Error:', errorData.error);
     } else {
       console.log('WhatsApp notification sent successfully.');
     }
   } catch (error) {
-    console.error('Error sending WhatsApp notification:', error);
+    console.error('Error sending WhatsApp notification through proxy:', error);
   }
 };
 
@@ -156,19 +157,25 @@ export const testWhatsAppConnection = async (
   console.log('Iniciando teste de WhatsApp...', { url, target: formattedTarget });
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch('/api/webhook-proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'apikey': settings.evolutionApiKey
       },
       body: JSON.stringify({
-        number: formattedTarget,
-        text: message,
-        options: {
-          delay: 1200,
-          presence: "composing",
-          linkPreview: false
+        url,
+        method: 'POST',
+        headers: {
+          'apikey': settings.evolutionApiKey
+        },
+        data: {
+          number: formattedTarget,
+          text: message,
+          options: {
+            delay: 1200,
+            presence: "composing",
+            linkPreview: false
+          }
         }
       }),
     });
@@ -177,21 +184,22 @@ export const testWhatsAppConnection = async (
       let errorMessage = `Erro HTTP: ${response.status}`;
       try {
         const errorData = await response.json();
-        console.error('EvolutionAPI Error Response:', errorData);
+        const apiError = errorData.error || errorData;
+        console.error('EvolutionAPI Error Response:', apiError);
         
-        if (errorData.message) {
-          if (Array.isArray(errorData.message)) {
-            errorMessage = errorData.message.join(', ');
+        if (apiError.message) {
+          if (Array.isArray(apiError.message)) {
+            errorMessage = apiError.message.join(', ');
           } else {
-            errorMessage = errorData.message;
+            errorMessage = apiError.message;
           }
-        } else if (errorData.error) {
-          errorMessage = errorData.error;
+        } else if (apiError.error) {
+          errorMessage = apiError.error;
+        } else if (typeof apiError === 'string') {
+          errorMessage = apiError;
         }
       } catch (e) {
-        const textError = await response.text();
-        console.error('EvolutionAPI Text Error:', textError);
-        errorMessage = textError || errorMessage;
+        errorMessage = "Erro ao processar resposta da API.";
       }
       throw new Error(errorMessage);
     }
@@ -200,9 +208,6 @@ export const testWhatsAppConnection = async (
     return true;
   } catch (error: any) {
     console.error('Erro na requisição ao EvolutionAPI:', error);
-    if (error.message === 'Failed to fetch') {
-      throw new Error("Não foi possível conectar ao servidor da API. Verifique se a URL está correta e se o servidor permite conexões (CORS).");
-    }
     throw error;
   }
 };
@@ -218,11 +223,18 @@ export const checkInstanceStatus = async (
   const url = `${baseUrl}/instance/connectionState/${settings.evolutionInstance}`;
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
+    const response = await fetch('/api/webhook-proxy', {
+      method: 'POST',
       headers: {
-        'apikey': settings.evolutionApiKey
-      }
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        method: 'GET',
+        headers: {
+          'apikey': settings.evolutionApiKey
+        }
+      }),
     });
 
     if (!response.ok) {

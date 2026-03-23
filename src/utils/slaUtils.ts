@@ -45,7 +45,10 @@ export const parseSlaToMs = (sla: string): number => {
 };
 
 export const getTicketSlaStatus = (ticket: Ticket): SlaStatus => {
-  if (!ticket.createdAt || !ticket.sla || ticket.status === "Resolvido") return "normal";
+  if (!ticket.createdAt || !ticket.sla || 
+      ticket.status === "Resolvido" || 
+      ticket.status === "Aguardando Cliente" || 
+      ticket.status === "Aguardando Terceiros") return "normal";
 
   let createdAtMs: number = 0;
   try {
@@ -81,7 +84,10 @@ export const getTicketSlaStatus = (ticket: Ticket): SlaStatus => {
 };
 
 export const getSlaProgress = (ticket: Ticket): number => {
-  if (!ticket.createdAt || !ticket.sla) return 0;
+  if (!ticket.createdAt || !ticket.sla || 
+      ticket.status === "Resolvido" || 
+      ticket.status === "Aguardando Cliente" || 
+      ticket.status === "Aguardando Terceiros") return 0;
   
   let createdAtMs: number = 0;
   try {

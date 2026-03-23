@@ -427,6 +427,49 @@ async function startServer() {
     res.json({ message: "Escala excluída" });
   });
 
+  // Webhook Proxy
+  app.post("/api/webhook-proxy", async (req, res) => {
+    const { url, data, method = 'POST', headers = {} } = req.body;
+    if (!url) return res.status(400).json({ error: "URL is required" });
+
+    try {
+      console.log(`Proxying ${method} request to: ${url}`);
+      
+      const fetchOptions: any = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        }
+      };
+
+      if (method !== 'GET' && method !== 'HEAD') {
+        fetchOptions.body = JSON.stringify(data);
+      }
+
+      const response = await fetch(url, fetchOptions);
+
+      const contentType = response.headers.get("content-type");
+      let responseData;
+      
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await response.json();
+      } else {
+        responseData = await response.text();
+      }
+
+      if (!response.ok) {
+        console.error(`Target returned error: ${response.status}`, responseData);
+        return res.status(response.status).json({ error: responseData });
+      }
+
+      res.json(responseData);
+    } catch (error: any) {
+      console.error('Error in webhook proxy:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

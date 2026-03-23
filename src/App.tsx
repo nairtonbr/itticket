@@ -56,7 +56,8 @@ import {
   Timestamp,
   addDoc,
   writeBatch,
-  runTransaction
+  runTransaction,
+  serverTimestamp
 } from "firebase/firestore";
 import { 
   signInWithEmailAndPassword, 
@@ -68,6 +69,9 @@ import {
   signInWithPopup
 } from "firebase/auth";
 import { initializeApp, getApps, getApp } from "firebase/app";
+
+// Session-level cache to prevent duplicate notifications in the same tab
+const notifiedInSession = new Set<string>();
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ClientName | "dashboard" | "reports" | "settings" | "schedule">("dashboard");
@@ -91,6 +95,18 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Refs to avoid stale closures in SLA monitor
+  const ticketsRef = useRef<Ticket[]>([]);
+  const settingsRef = useRef<AppSettings>(settings);
+
+  useEffect(() => {
+    ticketsRef.current = tickets;
+  }, [tickets]);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const searchResults = useMemo(() => {
     if (searchQuery.trim().length < 2) return [];
@@ -133,43 +149,121 @@ export default function App() {
 
   // SLA Monitor
   useEffect(() => {
-    if (!tickets.length || !settings) return;
+    if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'user')) return;
+
+    let lastCheckTime = 0;
+    const processingTickets = new Set<string>();
 
     const checkSlas = async () => {
       const now = Date.now();
       
-      for (const ticket of tickets) {
-        if (ticket.status === "Resolvido") continue;
+      // Prevent running more than once every 4 minutes (to be safe)
+      if (now - lastCheckTime < 4 * 60 * 1000) return;
+      
+      const currentTickets = ticketsRef.current;
+      const currentSettings = settingsRef.current;
+      
+      if (!currentTickets.length || !currentSettings) return;
 
+      lastCheckTime = now;
+      console.log(`[SLA Monitor] Starting check for ${currentTickets.length} tickets...`);
+      
+      // Filter only expired tickets that need notification
+      const expiredTickets = currentTickets.filter(ticket => {
+        if (notifiedInSession.has(ticket.id)) return false;
+
+        if (ticket.status === "Resolvido" || 
+            ticket.status === "Aguardando Cliente" || 
+            ticket.status === "Aguardando Terceiros") return false;
+            
         const status = getTicketSlaStatus(ticket);
-        if (status === "expired") {
-          const lastNotifyDate = getFirestoreDate(ticket.lastSlaNotification);
-          const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
-          const twoHoursMs = 2 * 60 * 60 * 1000;
+        if (status !== "expired") return false;
+
+        const lastNotifyDate = getFirestoreDate(ticket.lastSlaNotification);
+        const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
+        const fourHoursMs = 4 * 60 * 60 * 1000;
+        
+        return lastNotify === 0 || (now - lastNotify) >= fourHoursMs;
+      });
+
+      if (expiredTickets.length > 0) {
+        console.log(`[SLA Monitor] Found ${expiredTickets.length} candidates for notification.`);
+      }
+
+      for (const ticket of expiredTickets) {
+        if (processingTickets.has(ticket.id) || notifiedInSession.has(ticket.id)) continue;
+
+        try {
+          processingTickets.add(ticket.id);
           
-          if (lastNotify === 0 || (now - lastNotify) >= twoHoursMs) {
-            try {
-              // Update Firestore first to prevent other users from sending
-              await updateDoc(doc(db, "tickets", ticket.id), {
-                lastSlaNotification: Timestamp.now()
+          // Use a transaction to ensure only one client sends the notification
+          await runTransaction(db, async (transaction) => {
+            const ticketRef = doc(db, "tickets", ticket.id);
+            const ticketDoc = await transaction.get(ticketRef);
+            
+            if (!ticketDoc.exists()) return;
+            
+            const data = ticketDoc.data();
+            const lastNotifyDate = getFirestoreDate(data.lastSlaNotification);
+            const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
+            const fourHoursMs = 4 * 60 * 60 * 1000;
+            
+            // Re-verify status inside transaction
+            if (data.status === "Resolvido" || 
+                data.status === "Aguardando Cliente" || 
+                data.status === "Aguardando Terceiros") {
+              throw "Ticket status changed, skipping SLA alert";
+            }
+
+            if (lastNotify === 0 || (Date.now() - lastNotify) >= fourHoursMs) {
+              transaction.update(ticketRef, {
+                lastSlaNotification: serverTimestamp()
               });
               
-              // Then send the webhook
-              await sendWebhook(ticket, settings, "sla_breach");
-              await sendWhatsAppNotification(ticket, settings, "sla_breach");
-              console.log(`SLA Breach notifications sent for ticket ${ticket.id}`);
-            } catch (error) {
-              console.error(`Error processing SLA breach for ticket ${ticket.id}:`, error);
+              // Mark as notified locally immediately to prevent other loops in this tab
+              notifiedInSession.add(ticket.id);
+              
+              // We send notifications AFTER the transaction succeeds
+              return true;
+            } else {
+              throw "Already notified by another user";
             }
+          });
+          
+          // If we reached here, the transaction succeeded
+          await Promise.all([
+            sendWebhook(ticket, currentSettings, "sla_breach"),
+            sendWhatsAppNotification(ticket, currentSettings, "sla_breach")
+          ]);
+          
+          console.log(`[SLA Monitor] SUCCESS: Notifications sent for ticket ${ticket.id}`);
+          
+          // Keep in session cache for 4 hours
+          setTimeout(() => notifiedInSession.delete(ticket.id), 4 * 60 * 60 * 1000);
+        } catch (error) {
+          if (typeof error === 'string') {
+            console.log(`[SLA Monitor] Skip: ${error} for ticket ${ticket.id}`);
+          } else {
+            console.error(`[SLA Monitor] Transaction error for ticket ${ticket.id}:`, error);
           }
+          notifiedInSession.delete(ticket.id);
+        } finally {
+          processingTickets.delete(ticket.id);
         }
       }
     };
 
-    const interval = setInterval(checkSlas, 60000);
-    checkSlas();
-    return () => clearInterval(interval);
-  }, [tickets, settings]);
+    // Run check every 5 minutes
+    const interval = setInterval(checkSlas, 5 * 60 * 1000);
+    
+    // Initial check after 10 seconds to ensure everything is settled
+    const timeout = setTimeout(checkSlas, 10000);
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [userProfile?.role]); // Only depends on role to start/stop the monitor
 
   const handleArchiveOldTickets = async () => {
     if (!auth.currentUser || userProfile?.role !== "admin") return;

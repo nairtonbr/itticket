@@ -7,18 +7,26 @@ export const sendWebhook = async (ticket: Ticket, settings: AppSettings, type: '
   if (settings.webhookEnabled === false || !settings.webhookUrl) return;
 
   try {
-    await fetch(settings.webhookUrl, {
+    const response = await fetch('/api/webhook-proxy', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type,
-        ticket,
-        timestamp: new Date().toISOString()
+        url: settings.webhookUrl,
+        data: {
+          type,
+          ticket,
+          timestamp: new Date().toISOString()
+        }
       }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Webhook proxy error:', errorData.error);
+    }
   } catch (error) {
-    console.error('Error sending webhook:', error);
+    console.error('Error sending webhook through proxy:', error);
   }
 };
