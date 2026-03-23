@@ -16,10 +16,9 @@ interface SettingsViewProps {
   onDeleteUser: (uid: string) => Promise<void>;
   darkMode: boolean;
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
-  onResetSlaCache?: () => Promise<void>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode, onResetSlaCache }: SettingsViewProps) {
+export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
@@ -28,9 +27,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [evolutionInstance, setEvolutionInstance] = useState(settings.evolutionInstance || "");
   const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
   const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
-  const [slaAlertPhone, setSlaAlertPhone] = useState(settings.slaAlertPhone || "");
-  const [slaAlertsEnabled, setSlaAlertsEnabled] = useState(settings.slaAlertsEnabled ?? false);
-  const [disabledSlaClients, setDisabledSlaClients] = useState<string[]>(settings.disabledSlaClients || []);
   const [responsiblePhones, setResponsiblePhones] = useState<Record<string, string>>(settings.responsiblePhones || {});
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
@@ -66,9 +62,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setEvolutionInstance(settings.evolutionInstance || "");
     setWhatsappEnabled(settings.whatsappEnabled ?? true);
     setClientPhones(settings.clientPhones || {});
-    setSlaAlertPhone(settings.slaAlertPhone || "");
-    setSlaAlertsEnabled(settings.slaAlertsEnabled ?? true);
-    setDisabledSlaClients(settings.disabledSlaClients || []);
     setResponsiblePhones(settings.responsiblePhones || {});
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
@@ -131,27 +124,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
 
   const handleSaveResponsiblePhone = (responsible: string) => {
     onUpdateSettings({ responsiblePhones: { ...settings.responsiblePhones, [responsible]: responsiblePhones[responsible] || "" } });
-  };
-
-  const handleUpdateSlaPhone = (phone: string) => {
-    setSlaAlertPhone(phone);
-  };
-
-  const handleSaveSlaPhone = () => {
-    onUpdateSettings({ slaAlertPhone: slaAlertPhone });
-  };
-
-  const handleToggleSlaAlerts = (enabled: boolean) => {
-    setSlaAlertsEnabled(enabled);
-    onUpdateSettings({ slaAlertsEnabled: enabled });
-  };
-
-  const handleToggleClientSla = (client: string) => {
-    const newDisabled = disabledSlaClients.includes(client)
-      ? disabledSlaClients.filter(c => c !== client)
-      : [...disabledSlaClients, client];
-    setDisabledSlaClients(newDisabled);
-    onUpdateSettings({ disabledSlaClients: newDisabled });
   };
 
   const handleTestWhatsApp = async () => {
@@ -539,17 +511,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Destinatário Alertas SLA (Opcional)</label>
-                <input
-                  type="text"
-                  value={slaAlertPhone}
-                  onChange={(e) => setSlaAlertPhone(e.target.value)}
-                  placeholder="Número ou ID do Grupo para alertas de SLA vencido"
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
-                />
-                <p className="text-[10px] text-zinc-500 px-1">Se configurado, alertas de SLA serão enviados para este destino em vez do telefone do cliente.</p>
-              </div>
             </div>
             
             <div className="flex justify-end gap-3 pt-2">
@@ -562,7 +523,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 {isCheckingStatus ? 'Verificando...' : 'Verificar Status'}
               </button>
               <button
-                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance, whatsappEnabled, slaAlertPhone })}
+                onClick={() => onUpdateSettings({ evolutionApiUrl, evolutionApiKey, evolutionInstance, whatsappEnabled })}
                 className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
@@ -613,23 +574,10 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[...CLIENTS, ...customClients].sort().map((client) => {
-                const isDisabled = disabledSlaClients.includes(client);
                 return (
                   <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-zinc-900 dark:text-white">{client}</span>
-                      <button
-                        onClick={() => handleToggleClientSla(client)}
-                        title={isDisabled ? "Clique para ativar alertas de SLA para este cliente" : "Clique para desativar alertas de SLA para este cliente"}
-                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 ${
-                          !isDisabled 
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50" 
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
-                        }`}
-                      >
-                        <div className={`w-1.5 h-1.5 rounded-full ${!isDisabled ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
-                        {isDisabled ? "NOTIFICAÇÕES DESATIVADAS" : "NOTIFICAÇÕES ATIVADAS"}
-                      </button>
                     </div>
                     <input
                       type="text"
@@ -642,46 +590,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   </div>
                 );
               })}
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-2 relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-blue-700 dark:text-blue-400">Destinatário Alertas SLA</span>
-                    <AlertCircle className="w-4 h-4 text-blue-500" />
-                  </div>
-                  <button
-                    onClick={() => handleToggleSlaAlerts(!slaAlertsEnabled)}
-                    title={slaAlertsEnabled ? "Clique para desativar TODOS os alertas de SLA" : "Clique para ativar os alertas de SLA"}
-                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all flex items-center gap-1.5 ${
-                      slaAlertsEnabled 
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50" 
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
-                    }`}
-                  >
-                    <div className={`w-1.5 h-1.5 rounded-full ${slaAlertsEnabled ? "bg-blue-500 animate-pulse" : "bg-red-500"}`} />
-                    {slaAlertsEnabled ? "GERAL ATIVADO" : "GERAL DESATIVADO"}
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={slaAlertPhone}
-                  onChange={(e) => handleUpdateSlaPhone(e.target.value)}
-                  onBlur={handleSaveSlaPhone}
-                  placeholder="Ex: 5511999999999 ou 123456789@g.us"
-                  className="w-full bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
-                />
-                {onResetSlaCache && (
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      onClick={onResetSlaCache}
-                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                      title="Limpa o histórico de notificações para que os alertas sejam reenviados imediatamente"
-                    >
-                      <Activity className="w-3.5 h-3.5" />
-                      Resetar Cache de SLA
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 

@@ -36,7 +36,6 @@ export interface Ticket {
   archived?: number; // 0 for active, 1 for archived
   inProgressSince?: string; // ISO date when status became "Em Andamento"
   isImportant?: boolean;
-  lastSlaNotification?: any; // Firestore Timestamp
   history?: {
     action: string;
     user: string;
@@ -62,9 +61,6 @@ export interface AppSettings {
   whatsappEnabled?: boolean;
   webhookEnabled?: boolean;
   clientPhones?: Record<string, string>; // ClientName -> Phone Number
-  slaAlertPhone?: string; // Dedicated phone/group for SLA alerts
-  slaAlertsEnabled?: boolean;
-  disabledSlaClients?: string[];
   responsiblePhones?: Record<string, string>; // Responsible Name -> Phone Number
 }
 

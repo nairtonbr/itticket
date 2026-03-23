@@ -3,7 +3,7 @@ import { Ticket, AppSettings } from "../types";
 export const sendWhatsAppNotification = async (
   ticket: Ticket, 
   settings: AppSettings, 
-  type: 'create' | 'update' | 'status' | 'comment' | 'sla_breach'
+  type: 'create' | 'update' | 'status' | 'comment'
 ) => {
   if (settings.whatsappEnabled === false) {
     console.log("WhatsApp notification skipped: Disabled in settings.");
@@ -11,34 +11,9 @@ export const sendWhatsAppNotification = async (
   }
 
   const clientPhone = settings.clientPhones?.[ticket.client];
-  const slaPhone = settings.slaAlertPhone;
   const responsiblePhone = ticket.responsible ? settings.responsiblePhones?.[ticket.responsible] : null;
   
-  // Extra safety: Skip SLA alerts if disabled in settings
-  if (type === 'sla_breach') {
-    if (settings.slaAlertsEnabled === false) {
-      console.log("SLA breach notification skipped: Disabled in settings.");
-      return;
-    }
-    
-    const status = (ticket.status || "").toLowerCase().trim();
-    if (status === "resolvido" || 
-        status === "concluido" ||
-        status === "finalizado" ||
-        status === "aguardando cliente" || 
-        status === "aguardando terceiros") {
-      console.log("SLA breach notification skipped: Ticket is resolved or waiting.");
-      return;
-    }
-  }
-  
-  // Priority for SLA breach:
-  // 1. Responsible's phone (if configured)
-  // 2. Dedicated SLA alert phone
-  // 3. Client's phone
-  const targetPhone = type === 'sla_breach' 
-    ? (responsiblePhone || slaPhone || clientPhone)
-    : clientPhone;
+  const targetPhone = clientPhone;
   
   if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
     console.log("WhatsApp notification skipped: Missing configuration or target phone.");
@@ -98,11 +73,6 @@ export const sendWhatsAppNotification = async (
         message += `\n${updatesText}`;
       }
     }
-  }
- else if (type === 'sla_breach') {
-    message = `🆔 ID TICKET: ${ticket.id}\n`;
-    message += `🔰 Assunto: ${ticket.title}\n`;
-    message += `🚨 ALERTA: SLA Vencido!`;
   } else {
     // Fallback for generic update
     message = `🆔 ID TICKET: ${ticket.id}\n`;

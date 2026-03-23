@@ -442,12 +442,16 @@ async function startServer() {
     try {
       console.log(`Proxying ${method} request to: ${url}`);
       
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
       const fetchOptions: any = {
         method,
         headers: {
           'Content-Type': 'application/json',
           ...headers
-        }
+        },
+        signal: controller.signal
       };
 
       if (method !== 'GET' && method !== 'HEAD') {
@@ -455,6 +459,7 @@ async function startServer() {
       }
 
       const response = await fetch(url, fetchOptions);
+      clearTimeout(timeoutId);
 
       const contentType = response.headers.get("content-type");
       let responseData;

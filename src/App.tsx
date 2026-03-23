@@ -70,9 +70,6 @@ import {
 } from "firebase/auth";
 import { initializeApp, getApps, getApp } from "firebase/app";
 
-// Session-level cache to prevent duplicate notifications in the same tab
-const notifiedInSession = new Set<string>();
-
 export default function App() {
   const [activeTab, setActiveTab] = useState<ClientName | "dashboard" | "reports" | "settings" | "schedule">("dashboard");
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -147,142 +144,6 @@ export default function App() {
   useEffect(() => {
     // Loading is handled by onAuthStateChanged
   }, []);
-
-  // SLA Monitor
-  useEffect(() => {
-    if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'user')) return;
-
-    let lastCheckTime = 0;
-    const processingTickets = new Set<string>();
-
-    const checkSlas = async () => {
-      const now = Date.now();
-      
-      // Prevent running more than once every 4 minutes (to be safe)
-      if (now - lastCheckTime < 4 * 60 * 1000) return;
-      
-      const currentTickets = ticketsRef.current;
-      const currentSettings = settingsRef.current;
-      
-      if (!currentTickets.length || !currentSettings) return;
-
-      // Skip if global SLA alerts are disabled (Default to false for safety now)
-      // Added extra check for window.SLA_MONITOR_DISABLED as a kill-switch
-      if (currentSettings.slaAlertsEnabled !== true || (window as any).SLA_MONITOR_DISABLED) {
-        console.log("[SLA Monitor] SLA alerts are currently disabled in settings or by kill-switch.");
-        return;
-      }
-
-      lastCheckTime = now;
-      console.log(`[SLA Monitor] Starting check for ${currentTickets.length} tickets...`);
-      
-      // Filter only expired tickets that need notification
-      const expiredTickets = currentTickets.filter(ticket => {
-        if (notifiedInSession.has(ticket.id)) return false;
-
-        // Skip if SLA alerts are disabled for this specific client
-        if (currentSettings.disabledSlaClients?.includes(ticket.client)) return false;
-
-        const status = (ticket.status || "").toLowerCase().trim();
-        if (status === "resolvido" || 
-            status === "concluido" ||
-            status === "finalizado" ||
-            status === "aguardando cliente" || 
-            status === "aguardando terceiros") return false;
-            
-        const slaStatus = getTicketSlaStatus(ticket);
-        if (slaStatus !== "expired") return false;
-
-        const lastNotifyDate = getFirestoreDate(ticket.lastSlaNotification);
-        const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
-        const fourHoursMs = 4 * 60 * 60 * 1000;
-        
-        return lastNotify === 0 || (now - lastNotify) >= fourHoursMs;
-      });
-
-      if (expiredTickets.length > 0) {
-        console.log(`[SLA Monitor] Found ${expiredTickets.length} candidates for notification.`);
-      }
-
-      for (const ticket of expiredTickets) {
-        if (processingTickets.has(ticket.id) || notifiedInSession.has(ticket.id)) continue;
-
-        try {
-          processingTickets.add(ticket.id);
-          
-          // Use a transaction to ensure only one client sends the notification
-          await runTransaction(db, async (transaction) => {
-            const ticketRef = doc(db, "tickets", ticket.id);
-            const ticketDoc = await transaction.get(ticketRef);
-            
-            if (!ticketDoc.exists()) return;
-            
-            const data = ticketDoc.data();
-            const status = (data.status || "").toLowerCase().trim();
-            
-            // Re-verify status inside transaction
-            if (status === "resolvido" || 
-                status === "concluido" ||
-                status === "finalizado" ||
-                status === "aguardando cliente" || 
-                status === "aguardando terceiros") {
-              throw "Ticket status changed to resolved or waiting, skipping SLA alert";
-            }
-
-            const lastNotifyDate = getFirestoreDate(data.lastSlaNotification);
-            const lastNotify = lastNotifyDate ? lastNotifyDate.getTime() : 0;
-            const fourHoursMs = 4 * 60 * 60 * 1000;
-
-            if (lastNotify === 0 || (Date.now() - lastNotify) >= fourHoursMs) {
-              transaction.update(ticketRef, {
-                lastSlaNotification: serverTimestamp()
-              });
-              
-              // Mark as notified locally immediately to prevent other loops in this tab
-              notifiedInSession.add(ticket.id);
-              
-              // We send notifications AFTER the transaction succeeds
-              return true;
-            } else {
-              throw "Already notified by another user";
-            }
-          });
-          
-          // If we reached here, the transaction succeeded
-          await sendWebhook(ticket, currentSettings, "sla_breach");
-          const waResult = await sendWhatsAppNotification(ticket, currentSettings, "sla_breach");
-          if (waResult && !waResult.success) {
-            console.warn(`[SLA Monitor] WhatsApp notification failed for ticket ${ticket.id}: ${waResult.error}`);
-          }
-          
-          console.log(`[SLA Monitor] SUCCESS: Notifications sent for ticket ${ticket.id}`);
-          
-          // Keep in session cache for 4 hours
-          setTimeout(() => notifiedInSession.delete(ticket.id), 4 * 60 * 60 * 1000);
-        } catch (error) {
-          if (typeof error === 'string') {
-            console.log(`[SLA Monitor] Skip: ${error} for ticket ${ticket.id}`);
-          } else {
-            console.error(`[SLA Monitor] Transaction error for ticket ${ticket.id}:`, error);
-          }
-          notifiedInSession.delete(ticket.id);
-        } finally {
-          processingTickets.delete(ticket.id);
-        }
-      }
-    };
-
-    // Run check every 5 minutes
-    const interval = setInterval(checkSlas, 5 * 60 * 1000);
-    
-    // Initial check after 10 seconds to ensure everything is settled
-    const timeout = setTimeout(checkSlas, 10000);
-    
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [userProfile?.role]); // Only depends on role to start/stop the monitor
 
   const handleArchiveOldTickets = async () => {
     if (!auth.currentUser || userProfile?.role !== "admin") return;
@@ -711,16 +572,16 @@ export default function App() {
 
       await setDoc(doc(db, "tickets", ticketId), formattedData);
       
-      await sendWebhook(formattedData as Ticket, settings, "create");
-      const waResult = await sendWhatsAppNotification(formattedData as Ticket, settings, "create");
+      // Enviar notificações em segundo plano para não travar a UI
+      sendWebhook(formattedData as Ticket, settings, "create").catch(console.error);
+      sendWhatsAppNotification(formattedData as Ticket, settings, "create").then(waResult => {
+        if (waResult && !waResult.success) {
+          toast.error("Chamado criado, mas falha no WhatsApp: " + waResult.error);
+        }
+      }).catch(console.error);
       
       setIsModalOpen(false);
-      
-      if (waResult && !waResult.success) {
-        toast.success("Chamado criado, mas falha no WhatsApp: " + waResult.error);
-      } else {
-        toast.success("Chamado criado com sucesso!");
-      }
+      toast.success("Chamado criado com sucesso!");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "tickets");
     }
@@ -796,7 +657,7 @@ export default function App() {
 
       const finalTicket = { ...originalTicket, ...formattedUpdates } as Ticket;
       
-      let waError = null;
+      // Enviar notificações em segundo plano para não travar a UI
       if (settings.whatsappEnabled !== false) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const isCommentAdded = updates.updates !== undefined && (updates.updates.length > (originalTicket?.updates?.length || 0));
@@ -805,24 +666,20 @@ export default function App() {
         if (isStatusChange) whatsappType = "status";
         else if (isCommentAdded) whatsappType = "comment";
 
-        console.log(`Sending WhatsApp notification: ${whatsappType}`, { isStatusChange, isCommentAdded });
-        const waResult = await sendWhatsAppNotification(finalTicket, settings, whatsappType);
-        if (waResult && !waResult.success) {
-          waError = waResult.error;
-        }
+        sendWhatsAppNotification(finalTicket, settings, whatsappType).then(waResult => {
+          if (waResult && !waResult.success) {
+            toast.error("WhatsApp: " + waResult.error);
+          }
+        }).catch(console.error);
       }
 
       if (settings.webhookEnabled !== false && settings.webhookUrl) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const webhookType = isStatusChange ? "action" : "update";
-        await sendWebhook(finalTicket, settings, webhookType);
+        sendWebhook(finalTicket, settings, webhookType).catch(console.error);
       }
       
-      if (waError) {
-        toast.success(`Chamado atualizado, mas falha no WhatsApp: ${waError}`, { duration: 5000 });
-      } else {
-        toast.success("Chamado atualizado!");
-      }
+      toast.success("Chamado atualizado!");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `tickets/${ticketId}`);
     }
@@ -853,41 +710,6 @@ export default function App() {
       toast.success("Escala removida!");
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `schedules/${id}`);
-    }
-  };
-
-  const handleResetSlaCache = async () => {
-    try {
-      let count = 0;
-      let batches = [];
-      let currentBatch = writeBatch(db);
-      let operationsInCurrentBatch = 0;
-      
-      tickets.forEach(ticket => {
-        if (ticket.lastSlaNotification) {
-          if (operationsInCurrentBatch === 500) {
-            batches.push(currentBatch);
-            currentBatch = writeBatch(db);
-            operationsInCurrentBatch = 0;
-          }
-          currentBatch.update(doc(db, "tickets", ticket.id), { lastSlaNotification: null });
-          operationsInCurrentBatch++;
-          count++;
-        }
-      });
-      
-      if (operationsInCurrentBatch > 0) {
-        batches.push(currentBatch);
-      }
-      
-      for (const batch of batches) {
-        await batch.commit();
-      }
-      
-      notifiedInSession.clear();
-      toast.success(`Cache de SLA resetado para ${count} chamados.`);
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, "tickets");
     }
   };
 
@@ -1408,7 +1230,6 @@ export default function App() {
                 onDeleteUser={handleDeleteUser}
                 darkMode={darkMode}
                 setDarkMode={setDarkMode}
-                onResetSlaCache={handleResetSlaCache}
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />

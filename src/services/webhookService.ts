@@ -2,7 +2,7 @@ import { Ticket, AppSettings } from "../types";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
-export async function sendWebhook(ticket: Ticket, action: "create" | "update" | "sla_breach" | "action") {
+export async function sendWebhook(ticket: Ticket, action: "create" | "update" | "action") {
   try {
     const settingsDoc = await getDoc(doc(db, "settings", "global"));
     const settings = settingsDoc.data() as AppSettings | undefined;
