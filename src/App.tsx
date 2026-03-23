@@ -327,8 +327,7 @@ export default function App() {
     } else {
       ticketsQuery = query(
         collection(db, "tickets"),
-        where("client", "==", userProfile.associatedClient || ""),
-        orderBy("createdAt", "desc")
+        where("client", "==", userProfile.associatedClient || "")
       );
     }
 
@@ -714,7 +713,7 @@ export default function App() {
       }
 
       const matchesStatus = statusFilter === "Total" 
-        ? true 
+        ? t.status !== "Resolvido" 
         : statusFilter === "Aguardando" 
           ? (t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros")
           : statusFilter === "SLA Crítico"
@@ -1215,7 +1214,7 @@ export default function App() {
                 <div className="flex justify-center">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
                   {[
-                    { label: "Total", value: ticketsByTab.filter(t => !t.archived).length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
+                    { label: "Total", value: ticketsByTab.filter(t => !t.archived && t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
                     { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
                     { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
@@ -1241,7 +1240,7 @@ export default function App() {
                         else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
                         else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
                         else if (stat.label === "Aguardando Terceiros") setStatusFilter("Aguardando Terceiros");
-                        else if (stat.label === "SLA Crítico") setStatusFilter("Total");
+                        else if (stat.label === "SLA Crítico") setStatusFilter("SLA Crítico");
                       }}
                       className={`p-6 rounded-[2rem] border transition-all duration-500 text-left group relative overflow-hidden flex flex-col justify-between h-40 ${
                         (statusFilter === "Total" && stat.label === "Total") ||
@@ -1249,7 +1248,8 @@ export default function App() {
                         (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
                         (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
                         (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente") ||
-                        (statusFilter === "Aguardando Terceiros" && stat.label === "Aguardando Terceiros")
+                        (statusFilter === "Aguardando Terceiros" && stat.label === "Aguardando Terceiros") ||
+                        (statusFilter === "SLA Crítico" && stat.label === "SLA Crítico")
                           ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-2xl shadow-blue-500/10 dark:shadow-none ring-1 ring-blue-500/50" 
                           : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm hover:shadow-md"
                       }`}
