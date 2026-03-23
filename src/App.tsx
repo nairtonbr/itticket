@@ -856,6 +856,41 @@ export default function App() {
     }
   };
 
+  const handleResetSlaCache = async () => {
+    try {
+      let count = 0;
+      let batches = [];
+      let currentBatch = writeBatch(db);
+      let operationsInCurrentBatch = 0;
+      
+      tickets.forEach(ticket => {
+        if (ticket.lastSlaNotification) {
+          if (operationsInCurrentBatch === 500) {
+            batches.push(currentBatch);
+            currentBatch = writeBatch(db);
+            operationsInCurrentBatch = 0;
+          }
+          currentBatch.update(doc(db, "tickets", ticket.id), { lastSlaNotification: null });
+          operationsInCurrentBatch++;
+          count++;
+        }
+      });
+      
+      if (operationsInCurrentBatch > 0) {
+        batches.push(currentBatch);
+      }
+      
+      for (const batch of batches) {
+        await batch.commit();
+      }
+      
+      notifiedInSession.clear();
+      toast.success(`Cache de SLA resetado para ${count} chamados.`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, "tickets");
+    }
+  };
+
   const ticketsByTab = React.useMemo(() => {
     if (activeTab === "reports" || activeTab === "settings" || activeTab === "schedule") return [];
     
@@ -1373,6 +1408,7 @@ export default function App() {
                 onDeleteUser={handleDeleteUser}
                 darkMode={darkMode}
                 setDarkMode={setDarkMode}
+                onResetSlaCache={handleResetSlaCache}
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />

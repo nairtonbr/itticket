@@ -16,9 +16,10 @@ interface SettingsViewProps {
   onDeleteUser: (uid: string) => Promise<void>;
   darkMode: boolean;
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
+  onResetSlaCache?: () => Promise<void>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
+export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode, onResetSlaCache }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
@@ -668,6 +669,18 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                   placeholder="Ex: 5511999999999 ou 123456789@g.us"
                   className="w-full bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
                 />
+                {onResetSlaCache && (
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={onResetSlaCache}
+                      className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                      title="Limpa o histórico de notificações para que os alertas sejam reenviados imediatamente"
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      Resetar Cache de SLA
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
