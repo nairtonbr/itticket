@@ -313,6 +313,13 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Set default tab for clients
+  useEffect(() => {
+    if (userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos") {
+      setActiveTab(userProfile.associatedClient as ClientName);
+    }
+  }, [userProfile]);
+
   // Real-time Data Fetching (Firestore)
   useEffect(() => {
     if (!user || !userProfile) return;
@@ -325,11 +332,11 @@ export default function App() {
         orderBy("createdAt", "desc")
       );
     } else {
-      // For specific clients, we still want to order by createdAt
+      // For specific clients, we remove orderBy to avoid missing index errors
+      // Sorting is handled client-side in filteredTickets
       ticketsQuery = query(
         collection(db, "tickets"),
-        where("client", "==", userProfile.associatedClient || ""),
-        orderBy("createdAt", "desc")
+        where("client", "==", userProfile.associatedClient || "")
       );
     }
 
@@ -494,12 +501,18 @@ export default function App() {
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
       const uid = userCredential.user.uid;
       
-      await setDoc(doc(db, "users", uid), {
+      const profileData = {
         ...profile,
         uid,
         email,
         createdAt: new Date().toISOString()
-      });
+      };
+      
+      if (profileData.associatedClient) {
+        profileData.associatedClient = profileData.associatedClient.trim();
+      }
+      
+      await setDoc(doc(db, "users", uid), profileData);
       
       await signOut(secondaryAuth);
       toast.success("Usuário criado com sucesso!");
@@ -510,7 +523,11 @@ export default function App() {
 
   const handleUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
     try {
-      await setDoc(doc(db, "users", uid), data, { merge: true });
+      const updateData = { ...data };
+      if (updateData.associatedClient) {
+        updateData.associatedClient = updateData.associatedClient.trim();
+      }
+      await setDoc(doc(db, "users", uid), updateData, { merge: true });
       toast.success("Usuário atualizado com sucesso!");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
@@ -551,6 +568,7 @@ export default function App() {
         id: ticketId,
         status: "Aberto",
         title: ticketData.title?.toUpperCase(),
+        client: ticketData.client?.trim(),
         createdAt: now,
         updatedAt: now,
         updates: [],
@@ -585,6 +603,7 @@ export default function App() {
       
       const formattedUpdates: any = {
         ...updates,
+        client: updates.client?.trim(),
         updatedAt: now
       };
       
@@ -699,11 +718,23 @@ export default function App() {
     }
   };
 
-  const ticketsByTab = activeTab === "dashboard" || (userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos")
-    ? tickets 
-    : activeTab === "reports" || activeTab === "settings"
-      ? []
-      : tickets.filter(t => t.client?.trim() === activeTab?.trim());
+  const ticketsByTab = React.useMemo(() => {
+    if (activeTab === "reports" || activeTab === "settings" || activeTab === "schedule") return [];
+    
+    let baseTickets = tickets;
+    
+    // Role-based filtering
+    if (userProfile?.role === "client") {
+      const clientName = userProfile.associatedClient;
+      if (clientName && clientName !== "Todos") {
+        baseTickets = baseTickets.filter(t => t.client?.trim() === clientName.trim());
+      }
+    }
+    
+    if (activeTab === "dashboard") return baseTickets;
+    
+    return baseTickets.filter(t => t.client?.trim() === activeTab?.trim());
+  }, [tickets, activeTab, userProfile]);
 
   const filteredTickets = React.useMemo(() => {
     const filtered = ticketsByTab.filter(t => {
@@ -722,7 +753,7 @@ export default function App() {
             ? (t.status !== "Resolvido" && getTicketSlaStatus(t) === "expired")
             : t.status === statusFilter;
       
-      const matchesClient = clientFilter === "Todos" ? true : t.client === clientFilter;
+      const matchesClient = clientFilter === "Todos" ? true : t.client?.trim() === clientFilter?.trim();
       const matchesResponsible = responsibleFilter === "Todos" ? true : t.responsible === responsibleFilter;
       const matchesCategory = categoryFilter === "Todos" ? true : t.category === categoryFilter;
       
@@ -767,9 +798,14 @@ export default function App() {
   const paginatedTickets = filteredTickets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
 
-  const visibleClients = userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos"
-    ? [userProfile.associatedClient]
-    : allClients;
+  const visibleClients = React.useMemo(() => {
+    if (userProfile?.role === "client") {
+      return userProfile.associatedClient && userProfile.associatedClient !== "Todos" 
+        ? [userProfile.associatedClient] 
+        : [];
+    }
+    return allClients;
+  }, [userProfile, allClients]);
 
   if (loading) {
     return (
