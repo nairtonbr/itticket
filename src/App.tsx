@@ -325,9 +325,11 @@ export default function App() {
         orderBy("createdAt", "desc")
       );
     } else {
+      // For specific clients, we still want to order by createdAt
       ticketsQuery = query(
         collection(db, "tickets"),
-        where("client", "==", userProfile.associatedClient || "")
+        where("client", "==", userProfile.associatedClient || ""),
+        orderBy("createdAt", "desc")
       );
     }
 
@@ -697,7 +699,7 @@ export default function App() {
     }
   };
 
-  const ticketsByTab = activeTab === "dashboard" || (userProfile?.role === "client" && userProfile.associatedClient !== "Todos")
+  const ticketsByTab = activeTab === "dashboard" || (userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos")
     ? tickets 
     : activeTab === "reports" || activeTab === "settings"
       ? []
