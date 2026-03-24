@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star } from "lucide-react";
 import DatePicker, { registerLocale } from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { ptBR } from "date-fns/locale";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
 registerLocale("pt-BR", ptBR);
@@ -154,14 +155,13 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     
     if (user?.role === "client" && user.associatedClient === "Todos" && !client) {
       newErrors.client = "Cliente é obrigatório";
+    } else if (user?.role !== "client" && !client) {
+      newErrors.client = "Cliente é obrigatório";
     }
     
-    if (user?.role !== "client") {
-      if (!client) newErrors.client = "Cliente é obrigatório";
-      if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
-      if (!priority) newErrors.priority = "Prioridade é obrigatória";
-      if (!responsible) newErrors.responsible = "Responsável é obrigatório";
-    }
+    if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
+    if (!priority) newErrors.priority = "Prioridade é obrigatória";
+    if (!responsible) newErrors.responsible = "Responsável é obrigatório";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -178,16 +178,13 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       client: user?.role === "client" && user.associatedClient !== "Todos" ? user.associatedClient : client,
       status: ticket ? status : "Aberto",
       category: category || undefined,
-      attachments
+      attachments,
+      priority: priority || undefined,
+      totalHours,
+      responsible,
+      sla,
+      isImportant
     };
-
-    if (user?.role !== "client") {
-      data.priority = priority || undefined;
-      data.totalHours = totalHours;
-      data.responsible = responsible;
-      data.sla = sla;
-      data.isImportant = isImportant;
-    }
 
     if (ticket) {
       await onUpdate(ticket.id, data);
@@ -466,7 +463,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="flex-1">
                           <DatePicker 
                             selected={slaDate}
-                            disabled={user?.role === "client"}
                             onChange={(date: Date | null) => {
                               setSlaDate(date);
                               setSla(date ? date.toISOString().slice(0, 16) : "");
@@ -519,7 +515,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={priority}
-                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setPriority(e.target.value as TicketPriority);
                               if (errors.priority) setErrors(prev => ({ ...prev, priority: "" }));
@@ -543,7 +538,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={responsible}
-                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setResponsible(e.target.value);
                               if (errors.responsible) setErrors(prev => ({ ...prev, responsible: "" }));

@@ -658,7 +658,7 @@ export default function App() {
       }
 
       if (userProfile?.role === "client") {
-        const allowedFields = ["title", "description", "updates", "attachments", "status", "category", "client"];
+        const allowedFields = ["title", "description", "updates", "attachments", "status", "category", "client", "sla", "priority", "responsible", "totalHours", "isImportant"];
 
         Object.keys(updates).forEach(key => {
           if (!allowedFields.includes(key)) {
