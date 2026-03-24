@@ -16,17 +16,27 @@ export const sendWhatsAppNotification = async (
     // Global client recipients
     recipients = [...(settings.whatsappClientsList || [])];
     
-    // Specific client recipients
+    // Specific client recipients (new format)
     if (ticket.client && settings.whatsappClientMappings?.[ticket.client]) {
       recipients = [...recipients, ...settings.whatsappClientMappings[ticket.client]];
+    }
+    
+    // Specific client recipients (legacy format - fallback)
+    if (ticket.client && settings.clientPhones?.[ticket.client]) {
+      recipients.push(settings.clientPhones[ticket.client]);
     }
   } else if (type === 'sla') {
     // Global responsible recipients
     recipients = [...(settings.whatsappResponsiblesList || [])];
     
-    // Specific responsible recipients
+    // Specific responsible recipients (new format)
     if (ticket.responsible && settings.whatsappResponsibleMappings?.[ticket.responsible]) {
       recipients = [...recipients, ...settings.whatsappResponsibleMappings[ticket.responsible]];
+    }
+    
+    // Specific responsible recipients (legacy format - fallback)
+    if (ticket.responsible && settings.responsiblePhones?.[ticket.responsible]) {
+      recipients.push(settings.responsiblePhones[ticket.responsible]);
     }
   }
 

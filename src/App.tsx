@@ -146,35 +146,60 @@ export default function App() {
     const currentTickets = ticketsRef.current;
     const currentSettings = settingsRef.current;
 
+    // Get current time in Brasília (UTC-3)
+    const now = new Date();
+    const brasiliaTime = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false
+    }).format(now);
+
+    const [hour] = brasiliaTime.split(":").map(Number);
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Only run if it's 09:00 Brasília time or later, and hasn't run today
+    if (hour < 9) return;
+    if (currentSettings.lastSlaCheckDate === todayStr) return;
+
+    console.log(`Iniciando verificação diária de SLA às ${brasiliaTime} (Brasília)`);
+
+    // Update lastSlaCheckDate immediately to avoid race conditions from multiple clients
+    try {
+      await updateDoc(doc(db, "settings", "global"), {
+        lastSlaCheckDate: todayStr
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar data da última verificação de SLA:", error);
+      return;
+    }
+
     for (const ticket of currentTickets) {
       if (ticket.status === "Resolvido") continue;
 
       const slaStatus = getTicketSlaStatus(ticket);
 
-      console.log({
-        ticket: ticket.id,
-        sla: slaStatus,
-        notified: ticket.slaNotified
-      });
+      if (slaStatus === "expired") {
+        // We notify if it hasn't been notified today
+        const lastNotifiedAt = ticket.slaNotifiedAt;
+        const lastNotifiedDate = lastNotifiedAt ? lastNotifiedAt.split('T')[0] : null;
 
-      if (
-        slaStatus === "expired" &&
-        !ticket.slaNotified
-      ) {
-        console.log(`SLA estourado para ticket ${ticket.id}`);
+        if (lastNotifiedDate !== todayStr) {
+          console.log(`SLA estourado para ticket ${ticket.id}`);
 
-        try {
-          // Envia WhatsApp
-          await sendWhatsAppNotification(ticket, currentSettings, "sla");
+          try {
+            // Envia WhatsApp
+            await sendWhatsAppNotification(ticket, currentSettings, "sla");
 
-          // Marca como notificado
-          await updateDoc(doc(db, "tickets", ticket.id), {
-            slaNotified: true,
-            slaNotifiedAt: new Date().toISOString()
-          });
+            // Marca como notificado
+            await updateDoc(doc(db, "tickets", ticket.id), {
+              slaNotified: true,
+              slaNotifiedAt: new Date().toISOString()
+            });
 
-        } catch (error) {
-          console.error("Erro ao enviar SLA:", error);
+          } catch (error) {
+            console.error("Erro ao enviar SLA:", error);
+          }
         }
       }
     }

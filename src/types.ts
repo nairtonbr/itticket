@@ -68,6 +68,7 @@ export interface AppSettings {
   whatsappResponsiblesList?: string[];
   whatsappClientMappings?: Record<string, string[]>; // ClientName -> Phone numbers
   whatsappResponsibleMappings?: Record<string, string[]>; // ResponsibleName -> Phone numbers
+  lastSlaCheckDate?: string; // YYYY-MM-DD
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";
