@@ -34,6 +34,8 @@ export interface Ticket {
   updates: TicketUpdate[];
   attachments?: TicketAttachment[];
   archived?: number; // 0 for active, 1 for archived
+  slaNotified?: boolean;
+  slaNotifiedAt?: string | null;
   inProgressSince?: string; // ISO date when status became "Em Andamento"
   isImportant?: boolean;
   history?: {

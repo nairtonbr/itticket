@@ -140,6 +140,52 @@ export default function App() {
     return Array.from(new Set([...CATEGORIES, ...custom])).sort();
   }, [settings.customCategories]);
 
+  const checkSlaAndNotify = async () => {
+    const currentTickets = ticketsRef.current;
+    const currentSettings = settingsRef.current;
+
+    for (const ticket of currentTickets) {
+      if (ticket.status === "Resolvido") continue;
+
+      const slaStatus = getTicketSlaStatus(ticket);
+
+      console.log({
+        ticket: ticket.id,
+        sla: slaStatus,
+        notified: ticket.slaNotified
+      });
+
+      if (
+        slaStatus === "expired" &&
+        !ticket.slaNotified
+      ) {
+        console.log(`SLA estourado para ticket ${ticket.id}`);
+
+        try {
+          // Envia WhatsApp
+          await sendWhatsAppNotification(ticket, currentSettings, "sla");
+
+          // Marca como notificado
+          await updateDoc(doc(db, "tickets", ticket.id), {
+            slaNotified: true,
+            slaNotifiedAt: new Date().toISOString()
+          });
+
+        } catch (error) {
+          console.error("Erro ao enviar SLA:", error);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkSlaAndNotify();
+    }, 60000); // roda a cada 1 minuto
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Auth initialization - Rely solely on onAuthStateChanged
   useEffect(() => {
     // Loading is handled by onAuthStateChanged
@@ -558,6 +604,8 @@ export default function App() {
         updatedAt: now,
         updates: [],
         archived: 0,
+        slaNotified: false,
+        slaNotifiedAt: null,
         history: [{
           action: "Criação",
           user: userProfile?.displayName || userProfile?.email || "Sistema",
@@ -637,6 +685,14 @@ export default function App() {
             formattedUpdates.totalHours = currentTotal + elapsedHours;
             formattedUpdates.inProgressSince = null; // Clear it
           }
+        }
+
+        if (
+          newStatus === "Aberto" ||
+          newStatus === "Em Andamento"
+        ) {
+          formattedUpdates.slaNotified = false;
+          formattedUpdates.slaNotifiedAt = null;
         }
       }
 

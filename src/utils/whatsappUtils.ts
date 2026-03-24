@@ -3,7 +3,7 @@ import { Ticket, AppSettings } from "../types";
 export const sendWhatsAppNotification = async (
   ticket: Ticket, 
   settings: AppSettings, 
-  type: 'create' | 'update' | 'status' | 'comment'
+  type: 'create' | 'update' | 'status' | 'comment' | 'sla'
 ) => {
   if (settings.whatsappEnabled === false) {
     console.log("WhatsApp notification skipped: Disabled in settings.");
@@ -13,7 +13,7 @@ export const sendWhatsAppNotification = async (
   const clientPhone = settings.clientPhones?.[ticket.client];
   const responsiblePhone = ticket.responsible ? settings.responsiblePhones?.[ticket.responsible] : null;
   
-  const targetPhone = clientPhone;
+  const targetPhone = type === 'sla' ? responsiblePhone : clientPhone;
   
   if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
     console.log("WhatsApp notification skipped: Missing configuration or target phone.");
@@ -73,6 +73,11 @@ export const sendWhatsAppNotification = async (
         message += `\n${updatesText}`;
       }
     }
+  } else if (type === 'sla') {
+    message = `🚨 *ALERTA DE SLA*\n`;
+    message += `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `🔰 Assunto: ${ticket.title}\n`;
+    message += `⚠️ O SLA deste chamado estourou!`;
   } else {
     // Fallback for generic update
     message = `🆔 ID TICKET: ${ticket.id}\n`;
