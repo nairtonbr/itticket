@@ -26,7 +26,7 @@ export const sendWhatsAppNotification = async (
   
   if (!recipients.length) {
     console.log("Nenhum destinatário configurado para", type);
-    return { success: false, error: "Nenhum destinatário configurado" };
+    return { success: true }; // Return success so it doesn't show an error toast
   }
 
   if (!settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
