@@ -14,6 +14,16 @@ export const sendWhatsAppNotification = async (
   const responsiblePhone = ticket.responsible ? settings.responsiblePhones?.[ticket.responsible] : null;
   
   const targetPhone = type === 'sla' ? responsiblePhone : clientPhone;
+
+  console.log("WhatsApp Notification Debug:", { 
+    type, 
+    ticketId: ticket.id, 
+    responsible: ticket.responsible, 
+    responsiblePhone,
+    client: ticket.client, 
+    clientPhone,
+    targetPhone 
+  });
   
   if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
     console.log("WhatsApp notification skipped: Missing configuration or target phone.");

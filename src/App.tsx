@@ -94,6 +94,8 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  const normalize = (str?: string) => str?.trim().toLowerCase();
+  
   // Refs to avoid stale closures in SLA monitor
   const ticketsRef = useRef<Ticket[]>([]);
   const settingsRef = useRef<AppSettings>(settings);
@@ -272,7 +274,11 @@ export default function App() {
       // Alt + N: New Ticket
       if (e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault();
-        if (userProfile?.role !== 'client' || userProfile?.associatedClient) {
+        if (
+          userProfile?.role === "admin" ||
+          userProfile?.role === "user" ||
+          (userProfile?.role === "client" && userProfile?.associatedClient)
+        ) {
           setSelectedTicket(null);
           setIsModalOpen(true);
         }
@@ -599,7 +605,10 @@ export default function App() {
         id: ticketId,
         status: "Aberto",
         title: ticketData.title?.toUpperCase(),
-        client: ticketData.client?.trim(),
+        client:
+          userProfile?.role === "client"
+            ? userProfile.associatedClient
+            : ticketData.client?.trim(),
         createdAt: now,
         updatedAt: now,
         updates: [],
@@ -637,6 +646,26 @@ export default function App() {
 
   const handleUpdateTicket = async (ticketId: string, updates: Partial<Ticket>) => {
     try {
+      const originalTicket = tickets.find(t => t.id === ticketId);
+
+      if (
+        userProfile?.role === "client" &&
+        normalize(originalTicket?.client) !== normalize(userProfile.associatedClient)
+      ) {
+        toast.error("Você não tem permissão para editar este ticket");
+        return;
+      }
+
+      if (userProfile?.role === "client") {
+        const allowedFields = ["title", "description"];
+
+        Object.keys(updates).forEach(key => {
+          if (!allowedFields.includes(key)) {
+            delete updates[key as keyof Ticket];
+          }
+        });
+      }
+
       const author = userProfile?.displayName || userProfile?.email || "Sistema";
       const now = new Date().toISOString();
       
@@ -651,7 +680,6 @@ export default function App() {
       }
 
       // Find original ticket to track changes
-      const originalTicket = tickets.find(t => t.id === ticketId);
       const historyEntries: any[] = [];
 
       if (originalTicket) {
@@ -777,8 +805,10 @@ export default function App() {
     // Role-based filtering
     if (userProfile?.role === "client") {
       const clientName = userProfile.associatedClient;
-      if (clientName && clientName !== "Todos") {
-        baseTickets = baseTickets.filter(t => t.client?.trim() === clientName.trim());
+      if (clientName) {
+        baseTickets = baseTickets.filter(
+          t => normalize(t.client) === normalize(clientName)
+        );
       }
     }
     
