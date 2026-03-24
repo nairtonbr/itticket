@@ -671,9 +671,14 @@ export default function App() {
       
       const formattedUpdates: any = {
         ...updates,
-        client: updates.client?.trim(),
         updatedAt: now
       };
+      
+      if (formattedUpdates.client == null) {
+        delete formattedUpdates.client;
+      } else {
+        formattedUpdates.client = formattedUpdates.client.trim();
+      }
       
       if (updates.title) {
         formattedUpdates.title = updates.title.toUpperCase();
