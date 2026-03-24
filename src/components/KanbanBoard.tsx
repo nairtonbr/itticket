@@ -42,11 +42,6 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
 
       <div className="flex-1 bg-zinc-100/30 dark:bg-zinc-900/30 rounded-[2rem] p-4 space-y-4 overflow-y-auto border border-zinc-200/50 dark:border-zinc-800/50 min-h-[400px] custom-scrollbar">
         {tickets.map((ticket) => {
-          const slaStatus = getTicketSlaStatus(ticket);
-          const slaProgress = getSlaProgress(ticket);
-          const isExpired = slaStatus === "expired";
-          const isApproaching = slaStatus === "approaching";
-
           return (
             <motion.div
               key={ticket.id}
@@ -54,13 +49,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
               draggable
               onDragStart={(e) => onDragStart(e as unknown as React.DragEvent, ticket.id)}
               onClick={() => onTicketClick(ticket)}
-              className={`p-5 rounded-2xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white dark:bg-zinc-900 relative ${
-                isExpired 
-                  ? "border-red-500/50 ring-1 ring-red-500/20" 
-                  : isApproaching 
-                    ? "border-yellow-500/50" 
-                    : "border-zinc-200 dark:border-zinc-800"
-              } ${ticket.isImportant ? "ring-2 ring-yellow-500/50 bg-yellow-50/10 dark:bg-yellow-900/10" : ""}`}
+              className={`p-5 rounded-2xl shadow-sm border cursor-grab active:cursor-grabbing hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white dark:bg-zinc-900 relative border-zinc-200 dark:border-zinc-800 ${ticket.isImportant ? "ring-2 ring-yellow-500/50 bg-yellow-50/10 dark:bg-yellow-900/10" : ""}`}
             >
               {ticket.isImportant && (
                 <div className="absolute -right-1 -top-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-sm z-10 border-2 border-white dark:border-zinc-900">
@@ -73,11 +62,6 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
                   <span className="px-2 py-0.5 rounded-lg text-[9px] font-black uppercase bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700">
                     {ticket.client}
                   </span>
-                  {isExpired && (
-                    <div className="flex items-center gap-1 text-red-600 dark:text-red-400 animate-pulse" title="SLA Vencido!">
-                      <AlertCircle className="w-4 h-4" />
-                    </div>
-                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 justify-end">
                   {ticket.category && (
@@ -130,24 +114,6 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
                   </span>
                 </div>
               </div>
-
-              {ticket.sla && (
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
-                    <span className={isExpired || isApproaching ? "text-red-500" : "text-zinc-400"}>SLA</span>
-                    <span className={isExpired || isApproaching ? "text-red-600 dark:text-red-400 font-black" : "text-blue-600 dark:text-blue-400"}>{formatSlaDisplay(ticket.sla)}</span>
-                  </div>
-                  <div className={`w-full h-1 rounded-full overflow-hidden ${isExpired ? "bg-red-100 dark:bg-red-900/20" : "bg-zinc-100 dark:bg-zinc-800"}`}>
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${slaProgress}%` }}
-                      className={`h-full transition-all duration-1000 ${
-                        isExpired || isApproaching ? "bg-red-500" : "bg-blue-500"
-                      }`} 
-                    />
-                  </div>
-                </div>
-              )}
             </motion.div>
           );
         })}

@@ -1252,7 +1252,6 @@ export default function App() {
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
                     { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
                     { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros" && !t.archived).length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
-                    { label: "SLA Crítico", value: ticketsByTab.filter(t => getTicketSlaStatus(t) === "expired" && !t.archived).length, color: "orange", icon: <ShieldAlert />, gradient: "from-orange-500/10 to-transparent" },
                     { label: "Resolvidos", value: ticketsByTab.filter(t => {
                       if (t.status !== "Resolvido" || t.archived) return false;
                       const date = getFirestoreDate(t.updatedAt || t.createdAt);
@@ -1273,7 +1272,6 @@ export default function App() {
                         else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
                         else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
                         else if (stat.label === "Aguardando Terceiros") setStatusFilter("Aguardando Terceiros");
-                        else if (stat.label === "SLA Crítico") setStatusFilter("SLA Crítico");
                       }}
                       className={`p-6 rounded-[2rem] border transition-all duration-500 text-left group relative overflow-hidden flex flex-col justify-between h-40 ${
                         (statusFilter === "Total" && stat.label === "Total") ||
@@ -1281,8 +1279,7 @@ export default function App() {
                         (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
                         (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
                         (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente") ||
-                        (statusFilter === "Aguardando Terceiros" && stat.label === "Aguardando Terceiros") ||
-                        (statusFilter === "SLA Crítico" && stat.label === "SLA Crítico")
+                        (statusFilter === "Aguardando Terceiros" && stat.label === "Aguardando Terceiros")
                           ? "bg-white dark:bg-zinc-900 border-blue-500 shadow-2xl shadow-blue-500/10 dark:shadow-none ring-1 ring-blue-500/50" 
                           : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm hover:shadow-md"
                       }`}

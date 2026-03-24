@@ -33,7 +33,6 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
             <div className="w-[120px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Prioridade</div>
             <div className="w-[150px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Categoria</div>
             <div className="w-[180px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Responsável</div>
-            <div className="w-[100px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">SLA</div>
             <div className="w-[120px] px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest shrink-0">Criado em</div>
             <div className="w-[50px] px-6 py-4 shrink-0"></div>
           </div>
@@ -41,19 +40,11 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
           {/* List */}
           <div className="divide-y divide-zinc-100/50 dark:divide-zinc-800/50">
             {tickets.map((ticket) => {
-              const slaStatus = getTicketSlaStatus(ticket);
-              const isExpired = slaStatus === "expired";
-              const isApproaching = slaStatus === "approaching";
-
               return (
                 <div 
                   key={ticket.id}
                   onClick={() => onTicketClick(ticket)}
-                  className={`flex items-center group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-all duration-200 h-[80px] relative overflow-hidden ${
-                    isExpired || isApproaching
-                      ? "bg-red-50/40 dark:bg-red-900/10 border-l-4 border-l-red-500" 
-                      : "border-l-4 border-l-transparent"
-                  } ${ticket.isImportant ? "ring-1 ring-inset ring-yellow-500/50 bg-yellow-50/20 dark:bg-yellow-900/10" : ""}`}
+                  className={`flex items-center group hover:bg-blue-50/30 dark:hover:bg-blue-900/10 cursor-pointer transition-all duration-200 h-[80px] relative overflow-hidden border-l-4 border-l-transparent ${ticket.isImportant ? "ring-1 ring-inset ring-yellow-500/50 bg-yellow-50/20 dark:bg-yellow-900/10" : ""}`}
                 >
                   {ticket.isImportant && (
                     <div className="absolute right-0 top-0 w-8 h-8 flex items-center justify-center">
@@ -64,14 +55,9 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   
                   <div className="w-[120px] px-6 py-4 shrink-0 overflow-hidden">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-black font-mono tracking-tighter ${isExpired || isApproaching ? "text-red-700 dark:text-red-300" : "text-zinc-400 dark:text-zinc-500"}`} title={ticket.id}>
+                      <span className="text-[10px] font-black font-mono tracking-tighter text-zinc-400 dark:text-zinc-500" title={ticket.id}>
                         #{ticket.id}
                       </span>
-                      {isExpired && (
-                        <div className="flex items-center gap-1 text-red-600 dark:text-red-400 animate-pulse" title="SLA Vencido!">
-                          <AlertCircle className="w-4 h-4" />
-                        </div>
-                      )}
                       
                       <div className="flex items-center gap-1">
                         {ticket.updates && ticket.updates.length > 0 && (
@@ -86,9 +72,7 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                   
                   <div className="flex-1 px-6 py-4 overflow-hidden">
                     <div className="max-w-md">
-                      <p className={`font-bold text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight ${
-                        isExpired || isApproaching ? "text-red-700 dark:text-red-300" : "text-zinc-900 dark:text-zinc-100"
-                      }`}>
+                      <p className="font-bold text-sm truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-tight text-zinc-900 dark:text-zinc-100">
                         {ticket.title}
                       </p>
                       <p className="text-[11px] text-zinc-500 dark:text-zinc-500 line-clamp-1 mt-0.5 font-medium">
@@ -141,16 +125,6 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
                         {ticket.responsible || "Não atribuído"}
                       </span>
                     </div>
-                  </div>
-
-                  <div className="w-[100px] px-6 py-4 shrink-0">
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
-                      isExpired || isApproaching
-                        ? "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800" 
-                        : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800"
-                    }`}>
-                      {formatSlaDisplay(ticket.sla)}
-                    </span>
                   </div>
 
                   <div className="w-[120px] px-6 py-4 shrink-0">
