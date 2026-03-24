@@ -38,6 +38,15 @@ export const sendWhatsAppNotification = async (
     if (ticket.responsible && settings.responsiblePhones?.[ticket.responsible]) {
       recipients.push(settings.responsiblePhones[ticket.responsible]);
     }
+
+    // STRICT EXCLUSION: Ensure no client phones are in the SLA list
+    const clientPhones = new Set([
+      ...(settings.whatsappClientsList || []),
+      ...Object.values(settings.whatsappClientMappings || {}).flat(),
+      ...Object.values(settings.clientPhones || {})
+    ]);
+    
+    recipients = recipients.filter(phone => !clientPhones.has(phone));
   }
 
   // Remove duplicates and empty strings

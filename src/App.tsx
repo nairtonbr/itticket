@@ -146,28 +146,33 @@ export default function App() {
     const currentTickets = ticketsRef.current;
     const currentSettings = settingsRef.current;
 
-    // Get current time in Brasília (UTC-3)
+    // Get current time and date in Brasília (UTC-3)
     const now = new Date();
-    const brasiliaTime = new Intl.DateTimeFormat("pt-BR", {
+    const brasiliaDate = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Sao_Paulo",
-      hour: "numeric",
-      minute: "numeric",
-      hour12: false
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
     }).format(now);
 
-    const [hour] = brasiliaTime.split(":").map(Number);
-    const todayStr = now.toISOString().split('T')[0];
+    const brasiliaHour = parseInt(new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      hour: "numeric",
+      hour12: false
+    }).format(now));
 
     // Only run if it's 09:00 Brasília time or later, and hasn't run today
-    if (hour < 9) return;
-    if (currentSettings.lastSlaCheckDate === todayStr) return;
+    // We also check if the user is an admin because only admins can update the global settings
+    if (userProfile?.role !== 'admin') return;
+    if (brasiliaHour < 9) return;
+    if (currentSettings.lastSlaCheckDate === brasiliaDate) return;
 
-    console.log(`Iniciando verificação diária de SLA às ${brasiliaTime} (Brasília)`);
+    console.log(`[SLA MONITOR] Iniciando verificação diária de SLA às ${brasiliaHour}:00 (Brasília) do dia ${brasiliaDate}`);
 
     // Update lastSlaCheckDate immediately to avoid race conditions from multiple clients
     try {
       await updateDoc(doc(db, "settings", "global"), {
-        lastSlaCheckDate: todayStr
+        lastSlaCheckDate: brasiliaDate
       });
     } catch (error) {
       console.error("Erro ao atualizar data da última verificação de SLA:", error);
@@ -177,25 +182,42 @@ export default function App() {
     for (const ticket of currentTickets) {
       if (ticket.status === "Resolvido") continue;
 
+      // Skip if client has SLA notifications disabled
+      if (currentSettings.disabledSlaClients?.includes(ticket.client)) {
+        continue;
+      }
+
       const slaStatus = getTicketSlaStatus(ticket);
 
       if (slaStatus === "expired") {
-        // We notify if it hasn't been notified today
+        // We notify if it hasn't been notified today in Brasília time
         const lastNotifiedAt = ticket.slaNotifiedAt;
-        const lastNotifiedDate = lastNotifiedAt ? lastNotifiedAt.split('T')[0] : null;
+        let lastNotifiedDate = null;
+        
+        if (lastNotifiedAt) {
+          // Convert lastNotifiedAt (UTC) to Brasília date
+          lastNotifiedDate = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Sao_Paulo",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+          }).format(new Date(lastNotifiedAt));
+        }
 
-        if (lastNotifiedDate !== todayStr) {
-          console.log(`SLA estourado para ticket ${ticket.id}`);
+        if (lastNotifiedDate !== brasiliaDate) {
+          console.log(`[SLA MONITOR] Enviando notificação para ticket ${ticket.id} (Cliente: ${ticket.client})`);
 
           try {
             // Envia WhatsApp
-            await sendWhatsAppNotification(ticket, currentSettings, "sla");
-
-            // Marca como notificado
-            await updateDoc(doc(db, "tickets", ticket.id), {
-              slaNotified: true,
-              slaNotifiedAt: new Date().toISOString()
-            });
+            const result = await sendWhatsAppNotification(ticket, currentSettings, "sla");
+            
+            if (result.success !== false) {
+              // Marca como notificado
+              await updateDoc(doc(db, "tickets", ticket.id), {
+                slaNotified: true,
+                slaNotifiedAt: new Date().toISOString()
+              });
+            }
 
           } catch (error) {
             console.error("Erro ao enviar SLA:", error);
