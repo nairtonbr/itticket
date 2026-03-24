@@ -1,17 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
   Plus, 
   User, 
   Clock,
-  Trash2,
-  AlertCircle
+  Trash2
 } from "lucide-react";
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addDays, isWithinInterval } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'moment/locale/pt-br';
+
+moment.locale('pt-br');
+const localizer = momentLocalizer(moment);
 
 interface ScheduleEntry {
   id: string;
@@ -30,7 +31,6 @@ interface ScheduleViewProps {
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, onAdd, onDelete, users }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
   const [isAdding, setIsAdding] = useState(false);
   const [newEntry, setNewEntry] = useState<Partial<ScheduleEntry>>({
     shift: "Manhã",
@@ -40,6 +40,26 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
   const adminUsers = React.useMemo(() => {
     return users.filter(u => u.role === "admin");
   }, [users]);
+
+  const events = useMemo(() => {
+    return schedules.map(s => {
+      const start = new Date(s.date);
+      const end = s.endDate ? new Date(s.endDate) : new Date(s.date);
+      // Ensure end date includes the full day if it's a multi-day event
+      if (s.endDate) {
+        end.setHours(23, 59, 59, 999);
+      } else {
+        end.setHours(23, 59, 59, 999);
+      }
+      return {
+        id: s.id,
+        title: `${s.analyst} (${s.shift})`,
+        start,
+        end,
+        resource: s
+      };
+    });
+  }, [schedules]);
 
   const handleAddSchedule = async () => {
     if (!newEntry.analyst || !newEntry.date || !newEntry.shift) return;
@@ -66,19 +86,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
     await onDelete(id);
   };
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
-
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate,
-  });
-
-  const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
-  const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
-
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -98,101 +105,52 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         )}
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-        {/* Calendar Header */}
-        <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <CalendarIcon className="w-6 h-6 text-blue-600" />
-            <h3 className="text-xl font-black text-zinc-900 dark:text-white capitalize">
-              {format(currentDate, "MMMM yyyy", { locale: ptBR })}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={prevMonth} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-              <ChevronLeft className="w-5 h-5 text-zinc-500" />
-            </button>
-            <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
-              Hoje
-            </button>
-            <button onClick={nextMonth} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
-              <ChevronRight className="w-5 h-5 text-zinc-500" />
-            </button>
-          </div>
-        </div>
-
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7">
-          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
-            <div key={day} className="py-4 text-center text-[10px] font-black text-zinc-400 uppercase tracking-widest border-b border-zinc-100 dark:border-zinc-800">
-              {day}
-            </div>
-          ))}
-          {calendarDays.map((day, i) => {
-            const daySchedules = schedules.filter(s => {
-              const start = new Date(s.date);
-              start.setHours(0, 0, 0, 0);
-              const end = s.endDate ? new Date(s.endDate) : start;
-              end.setHours(23, 59, 59, 999);
-              
-              const checkDay = new Date(day);
-              checkDay.setHours(12, 0, 0, 0); // Check middle of day
-
-              return isWithinInterval(checkDay, { start, end });
-            });
-            const isCurrentMonth = isSameMonth(day, monthStart);
-            const isToday = isSameDay(day, new Date());
-
-            return (
-              <div 
-                key={day.toString()} 
-                className={`min-h-[140px] p-3 border-r border-b border-zinc-100 dark:border-zinc-800 last:border-r-0 transition-colors ${
-                  !isCurrentMonth ? "bg-zinc-50/50 dark:bg-zinc-950/20" : "bg-white dark:bg-zinc-900"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className={`text-sm font-black ${
-                    isToday ? "w-7 h-7 bg-blue-600 text-white rounded-lg flex items-center justify-center" : 
-                    isCurrentMonth ? "text-zinc-900 dark:text-white" : "text-zinc-300 dark:text-zinc-700"
-                  }`}>
-                    {format(day, "d")}
-                  </span>
+      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-100 dark:border-zinc-800 shadow-sm">
+        <Calendar
+          localizer={localizer}
+          events={events}
+          startAccessor="start"
+          endAccessor="end"
+          style={{ height: 600 }}
+          messages={{
+            next: "Próximo",
+            previous: "Anterior",
+            today: "Hoje",
+            month: "Mês",
+            week: "Semana",
+            day: "Dia",
+            agenda: "Agenda",
+            date: "Data",
+            time: "Hora",
+            event: "Evento",
+          }}
+          components={{
+            event: ({ event }) => (
+              <div className={`group relative p-1 rounded text-[10px] font-bold ${
+                event.resource.shift === "Manhã" ? "bg-blue-100 text-blue-800" :
+                event.resource.shift === "Tarde" ? "bg-orange-100 text-orange-800" :
+                event.resource.shift === "Noite" ? "bg-indigo-100 text-indigo-800" :
+                "bg-red-100 text-red-800"
+              }`}>
+                <div className="flex items-center gap-1 truncate">
+                  <User className="w-3 h-3 shrink-0" />
+                  <span className="truncate">{event.resource.analyst}</span>
                 </div>
-                
-                <div className="space-y-1.5">
-                  {daySchedules.map(s => (
-                    <div 
-                      key={s.id}
-                      className={`group relative p-2 rounded-xl text-[10px] font-bold border transition-all ${
-                        s.shift === "Manhã" ? "bg-blue-50 border-blue-100 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300" :
-                        s.shift === "Tarde" ? "bg-orange-50 border-orange-100 text-orange-700 dark:bg-orange-900/20 dark:border-orange-800 dark:text-orange-300" :
-                        s.shift === "Noite" ? "bg-indigo-50 border-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-300" :
-                        "bg-red-50 border-red-100 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 truncate">
-                        <User className="w-3 h-3 shrink-0" />
-                        <span className="truncate">{s.analyst}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 opacity-70">
-                        <Clock className="w-3 h-3 shrink-0" />
-                        <span>{s.shift}</span>
-                      </div>
-
-                      {isAdmin && (
-                        <button 
-                          onClick={() => handleDeleteScheduleClick(s.id)}
-                          className="absolute -top-1 -right-1 p-1 bg-white dark:bg-zinc-800 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                {isAdmin && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteScheduleClick(event.id as string);
+                    }}
+                    className="absolute -top-1 -right-1 p-0.5 bg-white rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
               </div>
-            );
-          })}
-        </div>
+            )
+          }}
+        />
       </div>
 
       {/* Add Modal */}

@@ -7,33 +7,33 @@ export const sendWhatsAppNotification = async (
 ) => {
   if (settings.whatsappEnabled === false) {
     console.log("WhatsApp notification skipped: Disabled in settings.");
-    return;
+    return { success: false, error: "Disabled in settings" };
   }
 
-  const clientPhone = settings.clientPhones?.[ticket.client];
-  const responsiblePhone = ticket.responsible ? settings.responsiblePhones?.[ticket.responsible] : null;
-  
-  const targetPhone = type === 'sla' ? responsiblePhone : clientPhone;
+  let recipients: string[] = [];
+
+  if (type === 'create' || type === 'update' || type === 'status' || type === 'comment') {
+    recipients = settings.whatsappClientsList || [];
+  } else if (type === 'sla') {
+    recipients = settings.whatsappResponsiblesList || [];
+  }
 
   console.log("WhatsApp Notification Debug:", { 
     type, 
     ticketId: ticket.id, 
-    responsible: ticket.responsible, 
-    responsiblePhone,
-    client: ticket.client, 
-    clientPhone,
-    targetPhone 
+    recipients
   });
   
-  if (!targetPhone || !settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
-    console.log("WhatsApp notification skipped: Missing configuration or target phone.");
-    return;
+  if (!recipients.length) {
+    console.log("Nenhum destinatário configurado para", type);
+    return { success: false, error: "Nenhum destinatário configurado" };
   }
 
-  // Format phone number or group ID
-  const isGroupId = targetPhone.includes('@g.us') || targetPhone.includes('-');
-  const formattedTarget = isGroupId ? targetPhone.trim() : targetPhone.replace(/\D/g, '');
-  
+  if (!settings.evolutionApiUrl || !settings.evolutionApiKey || !settings.evolutionInstance) {
+    console.log("WhatsApp notification skipped: Missing configuration.");
+    return { success: false, error: "Missing configuration" };
+  }
+
   let message = "";
 
   const getStatusIcon = (status: string) => {
@@ -64,15 +64,18 @@ export const sendWhatsAppNotification = async (
   if (type === 'create') {
     message = `*NOVO TICKET ABERTO*\n`;
     message += `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `👤 Cliente: ${ticket.client}\n`;
     message += `${getStatusIcon(ticket.status)} Status: ${getStatusDisplay(ticket.status)}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     message += `⏰ Prazo para atualização: ${ticket.sla}`;
   } else if (type === 'comment') {
     message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `👤 Cliente: ${ticket.client}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     message += formatUpdates(ticket.updates);
   } else if (type === 'status') {
     message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `👤 Cliente: ${ticket.client}\n`;
     message += `${getStatusIcon(ticket.status)} Status: ${getStatusDisplay(ticket.status)}\n`;
     message += `🔰 Assunto: ${ticket.title}`;
     
@@ -86,11 +89,13 @@ export const sendWhatsAppNotification = async (
   } else if (type === 'sla') {
     message = `🚨 *ALERTA DE SLA*\n`;
     message += `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `👤 Cliente: ${ticket.client}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     message += `⚠️ O SLA deste chamado estourou!`;
   } else {
     // Fallback for generic update
     message = `🆔 ID TICKET: ${ticket.id}\n`;
+    message += `👤 Cliente: ${ticket.client}\n`;
     message += `🔰 Assunto: ${ticket.title}\n`;
     const lastUpdate = ticket.updates?.[ticket.updates.length - 1]?.content || "Sem atualização";
     message += `🔄 Atualização: ${lastUpdate}`;
@@ -98,51 +103,66 @@ export const sendWhatsAppNotification = async (
 
   // Normalize URL (remove trailing slash)
   const baseUrl = settings.evolutionApiUrl.replace(/\/$/, '');
+  const url = `${baseUrl}/message/sendText/${encodeURIComponent(settings.evolutionInstance)}`;
   
-  try {
-    const url = `${baseUrl}/message/sendText/${encodeURIComponent(settings.evolutionInstance)}`;
+  let hasSuccess = false;
+  let lastError = "";
+
+  for (const phone of recipients) {
+    if (!phone) continue;
     
-    const response = await fetch('/api/webhook-proxy', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        url,
+    // Format phone number or group ID
+    const isGroupId = phone.includes('@g.us') || phone.includes('-');
+    const formattedTarget = isGroupId ? phone.trim() : phone.replace(/\D/g, '');
+    
+    try {
+      const response = await fetch('/api/webhook-proxy', {
         method: 'POST',
         headers: {
-          'apikey': settings.evolutionApiKey
+          'Content-Type': 'application/json',
         },
-        data: {
-          number: formattedTarget,
-          text: message,
-          options: {
-            delay: 1200,
-            presence: "composing",
-            linkPreview: false
+        body: JSON.stringify({
+          url,
+          method: 'POST',
+          headers: {
+            'apikey': settings.evolutionApiKey
+          },
+          data: {
+            number: formattedTarget,
+            text: message,
+            options: {
+              delay: 1200,
+              presence: "composing",
+              linkPreview: false
+            }
           }
-        }
-      }),
-    });
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      const apiError = errorData.error || errorData;
-      
-      let errorMessage = "Erro ao enviar WhatsApp";
-      if (response.status === 400 && JSON.stringify(apiError).includes('Connection Closed')) {
-        errorMessage = "WhatsApp desconectado. Reconecte na EvolutionAPI.";
-      } else if (response.status === 404) {
-        errorMessage = "Instância do WhatsApp não encontrada.";
+      if (!response.ok) {
+        const errorData = await response.json();
+        const apiError = errorData.error || errorData;
+        
+        let errorMessage = "Erro ao enviar WhatsApp";
+        if (response.status === 400 && JSON.stringify(apiError).includes('Connection Closed')) {
+          errorMessage = "WhatsApp desconectado. Reconecte na EvolutionAPI.";
+        } else if (response.status === 404) {
+          errorMessage = "Instância do WhatsApp não encontrada.";
+        }
+        lastError = errorMessage;
+      } else {
+        hasSuccess = true;
       }
-      
-      return { success: false, error: errorMessage };
-    } else {
-      console.log('WhatsApp notification sent successfully.');
-      return { success: true };
+    } catch (error: any) {
+      lastError = error.message;
     }
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  }
+
+  if (hasSuccess) {
+    console.log('WhatsApp notification sent successfully to at least one recipient.');
+    return { success: true };
+  } else {
+    return { success: false, error: lastError || "Falha ao enviar para todos os destinatários" };
   }
 };
 

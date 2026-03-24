@@ -381,8 +381,8 @@ export default function App() {
         setSettings(prev => ({ 
           ...prev, 
           ...data,
-          responsiblePhones: data.responsiblePhones || {},
-          clientPhones: data.clientPhones || {},
+          whatsappClientsList: data.whatsappClientsList || [],
+          whatsappResponsiblesList: data.whatsappResponsiblesList || [],
           clientLogos: data.clientLogos || {},
           clientResponsibles: data.clientResponsibles || {},
           customClients: data.customClients || [],

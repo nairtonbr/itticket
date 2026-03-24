@@ -62,8 +62,10 @@ export interface AppSettings {
   evolutionInstance?: string;
   whatsappEnabled?: boolean;
   webhookEnabled?: boolean;
-  clientPhones?: Record<string, string>; // ClientName -> Phone Number
-  responsiblePhones?: Record<string, string>; // Responsible Name -> Phone Number
+  clientPhones?: Record<string, string>; // Deprecated
+  responsiblePhones?: Record<string, string>; // Deprecated
+  whatsappClientsList?: string[];
+  whatsappResponsiblesList?: string[];
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";

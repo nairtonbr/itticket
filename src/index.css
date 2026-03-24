@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
-@import "react-datepicker/dist/react-datepicker.css";
+@import "react-big-calendar/lib/css/react-big-calendar.css";
 
 @theme {
   --font-sans: "Quicksand", ui-sans-serif, system-ui, sans-serif;
@@ -46,30 +46,3 @@
   @apply bg-zinc-300 dark:bg-zinc-700;
 }
 
-.react-datepicker-wrapper {
-  @apply w-full;
-}
-.react-datepicker {
-  @apply !bg-zinc-50 dark:!bg-zinc-900 !border-zinc-200 dark:!border-zinc-800 !rounded-2xl !shadow-xl !font-sans;
-}
-.react-datepicker__header {
-  @apply !bg-zinc-50 dark:!bg-zinc-900 !border-b-zinc-200 dark:!border-b-zinc-800;
-}
-.react-datepicker__day--selected {
-  @apply !bg-zinc-900 dark:!bg-zinc-100 !text-white dark:!text-zinc-900;
-}
-.react-datepicker__day:hover {
-  @apply !bg-zinc-200 dark:!bg-zinc-700;
-}
-.react-datepicker__current-month, .react-datepicker__day-name, .react-datepicker__time-name {
-  @apply !text-zinc-900 dark:!text-zinc-100;
-}
-.react-datepicker__time-container {
-  @apply !border-l-zinc-200 dark:!border-l-zinc-800;
-}
-.react-datepicker__time-list-item--selected {
-  @apply !bg-zinc-900 dark:!bg-zinc-100 !text-white dark:!text-zinc-900 !font-bold;
-}
-.react-datepicker__time-list-item:hover {
-  @apply !bg-zinc-200 dark:!bg-zinc-700;
-}

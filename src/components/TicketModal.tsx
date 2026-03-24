@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star } from "lucide-react";
-import DatePicker, { registerLocale } from "react-datepicker";
 import { ptBR } from "date-fns/locale";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
-registerLocale("pt-BR", ptBR);
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
 import { parseSlaToMs } from "../utils/slaUtils";
@@ -32,7 +30,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
-  const [slaDate, setSlaDate] = useState<Date | null>(null);
   const [isImportant, setIsImportant] = useState(false);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [liveElapsed, setLiveElapsed] = useState(0);
@@ -109,7 +106,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
           }
         }
         setSla(initialSla);
-        setSlaDate(initialSla ? new Date(initialSla) : null);
         
         setIsImportant(ticket.isImportant || false);
         setTotalHours(ticket.totalHours || 0);
@@ -463,19 +459,15 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           SLA / Prazo <span className="text-red-500">*</span>:
                         </span>
                         <div className="flex-1">
-                          <DatePicker 
-                            selected={slaDate}
+                          <input 
+                            type="datetime-local"
                             disabled={user?.role === "client"}
-                            onChange={(date: Date | null) => {
-                              setSlaDate(date);
-                              setSla(date ? date.toISOString().slice(0, 16) : "");
+                            value={sla}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSla(val);
                               if (errors.sla) setErrors(prev => ({ ...prev, sla: "" }));
                             }}
-                            showTimeSelect
-                            timeFormat="HH:mm"
-                            timeIntervals={15}
-                            dateFormat="dd/MM/yyyy HH:mm"
-                            locale="pt-BR"
                             className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600 ${
                               errors.sla ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
                             }`}

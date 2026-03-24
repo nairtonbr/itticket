@@ -26,8 +26,11 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [evolutionApiKey, setEvolutionApiKey] = useState(settings.evolutionApiKey || "");
   const [evolutionInstance, setEvolutionInstance] = useState(settings.evolutionInstance || "");
   const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
-  const [clientPhones, setClientPhones] = useState<Record<string, string>>(settings.clientPhones || {});
-  const [responsiblePhones, setResponsiblePhones] = useState<Record<string, string>>(settings.responsiblePhones || {});
+  const [whatsappClientsList, setWhatsappClientsList] = useState<string[]>(settings.whatsappClientsList || []);
+  const [whatsappResponsiblesList, setWhatsappResponsiblesList] = useState<string[]>(settings.whatsappResponsiblesList || []);
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [newResponsiblePhone, setNewResponsiblePhone] = useState("");
+  
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
   const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
@@ -61,13 +64,41 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setEvolutionApiKey(settings.evolutionApiKey || "");
     setEvolutionInstance(settings.evolutionInstance || "");
     setWhatsappEnabled(settings.whatsappEnabled ?? true);
-    setClientPhones(settings.clientPhones || {});
-    setResponsiblePhones(settings.responsiblePhones || {});
+    setWhatsappClientsList(settings.whatsappClientsList || []);
+    setWhatsappResponsiblesList(settings.whatsappResponsiblesList || []);
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
     setCustomCategories(settings.customCategories || []);
   }, [settings]);
+
+  const handleAddClientPhone = () => {
+    if (!newClientPhone.trim()) return;
+    const newList = [...whatsappClientsList, newClientPhone.trim()];
+    setWhatsappClientsList(newList);
+    onUpdateSettings({ whatsappClientsList: newList });
+    setNewClientPhone("");
+  };
+
+  const handleRemoveClientPhone = (phone: string) => {
+    const newList = whatsappClientsList.filter(p => p !== phone);
+    setWhatsappClientsList(newList);
+    onUpdateSettings({ whatsappClientsList: newList });
+  };
+
+  const handleAddResponsiblePhone = () => {
+    if (!newResponsiblePhone.trim()) return;
+    const newList = [...whatsappResponsiblesList, newResponsiblePhone.trim()];
+    setWhatsappResponsiblesList(newList);
+    onUpdateSettings({ whatsappResponsiblesList: newList });
+    setNewResponsiblePhone("");
+  };
+
+  const handleRemoveResponsiblePhone = (phone: string) => {
+    const newList = whatsappResponsiblesList.filter(p => p !== phone);
+    setWhatsappResponsiblesList(newList);
+    onUpdateSettings({ whatsappResponsiblesList: newList });
+  };
 
   const handleSaveGeneral = async () => {
     setMessage(null);
@@ -106,24 +137,6 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     };
     setClientResponsibles(newResponsibles);
     onUpdateSettings({ clientResponsibles: newResponsibles });
-  };
-
-  const handleUpdatePhone = (client: string, phone: string) => {
-    const newPhones = { ...clientPhones, [client]: phone };
-    setClientPhones(newPhones);
-  };
-
-  const handleSavePhone = (client: string) => {
-    onUpdateSettings({ clientPhones: { ...settings.clientPhones, [client]: clientPhones[client] || "" } });
-  };
-
-  const handleUpdateResponsiblePhone = (responsible: string, phone: string) => {
-    const newPhones = { ...responsiblePhones, [responsible]: phone };
-    setResponsiblePhones(newPhones);
-  };
-
-  const handleSaveResponsiblePhone = (responsible: string) => {
-    onUpdateSettings({ responsiblePhones: { ...settings.responsiblePhones, [responsible]: responsiblePhones[responsible] || "" } });
   };
 
   const handleTestWhatsApp = async () => {
@@ -568,28 +581,40 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
                 <UsersIcon className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">WhatsApp ou ID do Grupo por Cliente</h3>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Lista de WhatsApp para Clientes</h3>
             </div>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe um número de WhatsApp ou ID de Grupo (JID) a cada cliente.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Estes números receberão notificações de <b>Criação</b> e <b>Atualização</b> de tickets.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[...CLIENTS, ...customClients].sort().map((client) => {
-                return (
-                  <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2 relative">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{client}</span>
-                    </div>
-                    <input
-                      type="text"
-                      value={clientPhones[client] || ""}
-                      onChange={(e) => handleUpdatePhone(client, e.target.value)}
-                      onBlur={() => handleSavePhone(client)}
-                      placeholder="Ex: 5511999999999 ou 123456789@g.us"
-                      className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
-                    />
-                  </div>
-                );
-              })}
+            <div className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={newClientPhone}
+                onChange={(e) => setNewClientPhone(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddClientPhone()}
+                placeholder="Ex: 5511999999999 ou 123456789@g.us"
+                className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+              />
+              <button
+                onClick={handleAddClientPhone}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {whatsappClientsList.map((phone) => (
+                <div key={phone} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white">{phone}</span>
+                  <button onClick={() => handleRemoveClientPhone(phone)} className="text-zinc-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+              {whatsappClientsList.length === 0 && (
+                <p className="text-sm text-zinc-400 italic">Nenhum número configurado para clientes.</p>
+              )}
             </div>
           </div>
 
@@ -598,28 +623,39 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
                 <User className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">WhatsApp por Responsável</h3>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Lista de WhatsApp para Responsáveis</h3>
             </div>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe um número de WhatsApp a cada responsável. Alertas de SLA serão enviados individualmente se configurado.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Estes números receberão alertas de <b>SLA Estourado</b>.</p>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {allResponsibles.map((responsible) => (
-                <div key={responsible} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-2 relative">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{responsible}</span>
-                  </div>
-                  <input
-                    type="text"
-                    value={responsiblePhones[responsible] || ""}
-                    onChange={(e) => handleUpdateResponsiblePhone(responsible, e.target.value)}
-                    onBlur={() => handleSaveResponsiblePhone(responsible)}
-                    placeholder="Ex: 5511999999999"
-                    className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
-                  />
+            <div className="flex gap-3 mb-6">
+              <input
+                type="text"
+                value={newResponsiblePhone}
+                onChange={(e) => setNewResponsiblePhone(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddResponsiblePhone()}
+                placeholder="Ex: 5511999999999 ou 123456789@g.us"
+                className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+              />
+              <button
+                onClick={handleAddResponsiblePhone}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {whatsappResponsiblesList.map((phone) => (
+                <div key={phone} className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white">{phone}</span>
+                  <button onClick={() => handleRemoveResponsiblePhone(phone)} className="text-zinc-400 hover:text-red-500 transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
-              {allResponsibles.length === 0 && (
-                <p className="text-sm text-zinc-400 italic col-span-2">Nenhum responsável cadastrado nos clientes.</p>
+              {whatsappResponsiblesList.length === 0 && (
+                <p className="text-sm text-zinc-400 italic">Nenhum número configurado para responsáveis.</p>
               )}
             </div>
           </div>
