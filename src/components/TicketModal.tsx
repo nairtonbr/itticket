@@ -148,13 +148,17 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     
     // Validation
     const newErrors: Record<string, string> = {};
-    if (!title.trim()) newErrors.title = "Título é obrigatório";
-    if (!client) newErrors.client = "Cliente é obrigatório";
-    if (!category) newErrors.category = "Categoria é obrigatória";
-    if (!status) newErrors.status = "Status é obrigatório";
-    if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
-    if (!priority) newErrors.priority = "Prioridade é obrigatória";
-    if (!responsible) newErrors.responsible = "Responsável é obrigatório";
+    if (user?.role !== "client") {
+      if (!title.trim()) newErrors.title = "Título é obrigatório";
+      if (!client) newErrors.client = "Cliente é obrigatório";
+      if (!category) newErrors.category = "Categoria é obrigatória";
+      if (!status) newErrors.status = "Status é obrigatório";
+      if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
+      if (!priority) newErrors.priority = "Prioridade é obrigatória";
+      if (!responsible) newErrors.responsible = "Responsável é obrigatório";
+    } else {
+      if (!status) newErrors.status = "Status é obrigatório";
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -165,7 +169,9 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     setErrors({});
     setIsSubmitting(true);
     
-    const data = {
+    const data = user?.role === "client" ? {
+      status: ticket ? status : "Aberto",
+    } : {
       title,
       description,
       client: user?.role === "client" && user.associatedClient !== "Todos" ? user.associatedClient : client,
@@ -325,6 +331,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               <input 
                 type="text" 
                 value={title}
+                disabled={user?.role === "client"}
                 onChange={(e) => {
                   setTitle(e.target.value.toUpperCase());
                   if (errors.title) setErrors(prev => ({ ...prev, title: "" }));
@@ -337,6 +344,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               {errors.title && <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">{errors.title}</p>}
               <textarea 
                 value={description}
+                disabled={user?.role === "client"}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Adicione uma descrição para este chamado..."
                 className="w-full text-sm text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 min-h-[100px]"
@@ -419,6 +427,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="flex-1 relative group">
                           <select 
                             value={category}
+                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setCategory(e.target.value);
                               if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
@@ -456,6 +465,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="flex-1">
                           <DatePicker 
                             selected={slaDate}
+                            disabled={user?.role === "client"}
                             onChange={(date: Date | null) => {
                               setSlaDate(date);
                               setSla(date ? date.toISOString().slice(0, 16) : "");
@@ -508,6 +518,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={priority}
+                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setPriority(e.target.value as TicketPriority);
                               if (errors.priority) setErrors(prev => ({ ...prev, priority: "" }));
@@ -531,6 +542,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="relative group">
                           <select 
                             value={responsible}
+                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setResponsible(e.target.value);
                               if (errors.responsible) setErrors(prev => ({ ...prev, responsible: "" }));
