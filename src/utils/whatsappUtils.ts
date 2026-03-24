@@ -13,10 +13,25 @@ export const sendWhatsAppNotification = async (
   let recipients: string[] = [];
 
   if (type === 'create' || type === 'update' || type === 'status' || type === 'comment') {
-    recipients = settings.whatsappClientsList || [];
+    // Global client recipients
+    recipients = [...(settings.whatsappClientsList || [])];
+    
+    // Specific client recipients
+    if (ticket.client && settings.whatsappClientMappings?.[ticket.client]) {
+      recipients = [...recipients, ...settings.whatsappClientMappings[ticket.client]];
+    }
   } else if (type === 'sla') {
-    recipients = settings.whatsappResponsiblesList || [];
+    // Global responsible recipients
+    recipients = [...(settings.whatsappResponsiblesList || [])];
+    
+    // Specific responsible recipients
+    if (ticket.responsible && settings.whatsappResponsibleMappings?.[ticket.responsible]) {
+      recipients = [...recipients, ...settings.whatsappResponsibleMappings[ticket.responsible]];
+    }
   }
+
+  // Remove duplicates and empty strings
+  recipients = Array.from(new Set(recipients.filter(r => !!r)));
 
   console.log("WhatsApp Notification Debug:", { 
     type, 

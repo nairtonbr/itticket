@@ -66,6 +66,8 @@ export interface AppSettings {
   responsiblePhones?: Record<string, string>; // Deprecated
   whatsappClientsList?: string[];
   whatsappResponsiblesList?: string[];
+  whatsappClientMappings?: Record<string, string[]>; // ClientName -> Phone numbers
+  whatsappResponsibleMappings?: Record<string, string[]>; // ResponsibleName -> Phone numbers
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";

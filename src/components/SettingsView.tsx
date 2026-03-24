@@ -28,8 +28,12 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [whatsappEnabled, setWhatsappEnabled] = useState(settings.whatsappEnabled ?? true);
   const [whatsappClientsList, setWhatsappClientsList] = useState<string[]>(settings.whatsappClientsList || []);
   const [whatsappResponsiblesList, setWhatsappResponsiblesList] = useState<string[]>(settings.whatsappResponsiblesList || []);
+  const [whatsappClientMappings, setWhatsappClientMappings] = useState<Record<string, string[]>>(settings.whatsappClientMappings || {});
+  const [whatsappResponsibleMappings, setWhatsappResponsibleMappings] = useState<Record<string, string[]>>(settings.whatsappResponsibleMappings || {});
   const [newClientPhone, setNewClientPhone] = useState("");
   const [newResponsiblePhone, setNewResponsiblePhone] = useState("");
+  const [newMappingPhone, setNewMappingPhone] = useState("");
+  const [selectedMappingTarget, setSelectedMappingTarget] = useState("");
   
   const [clientLogos, setClientLogos] = useState<Record<string, string>>(settings.clientLogos || {});
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
@@ -66,6 +70,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setWhatsappEnabled(settings.whatsappEnabled ?? true);
     setWhatsappClientsList(settings.whatsappClientsList || []);
     setWhatsappResponsiblesList(settings.whatsappResponsiblesList || []);
+    setWhatsappClientMappings(settings.whatsappClientMappings || {});
+    setWhatsappResponsibleMappings(settings.whatsappResponsibleMappings || {});
     setClientLogos(settings.clientLogos || {});
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
@@ -98,6 +104,52 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     const newList = whatsappResponsiblesList.filter(p => p !== phone);
     setWhatsappResponsiblesList(newList);
     onUpdateSettings({ whatsappResponsiblesList: newList });
+  };
+
+  const handleAddClientMapping = (client: string, phone: string) => {
+    if (!phone.trim()) return;
+    const current = whatsappClientMappings[client] || [];
+    if (current.includes(phone.trim())) return;
+    
+    const newMappings = { 
+      ...whatsappClientMappings, 
+      [client]: [...current, phone.trim()] 
+    };
+    setWhatsappClientMappings(newMappings);
+    onUpdateSettings({ whatsappClientMappings: newMappings });
+  };
+
+  const handleRemoveClientMapping = (client: string, phone: string) => {
+    const current = whatsappClientMappings[client] || [];
+    const newMappings = { 
+      ...whatsappClientMappings, 
+      [client]: current.filter(p => p !== phone) 
+    };
+    setWhatsappClientMappings(newMappings);
+    onUpdateSettings({ whatsappClientMappings: newMappings });
+  };
+
+  const handleAddResponsibleMapping = (responsible: string, phone: string) => {
+    if (!phone.trim()) return;
+    const current = whatsappResponsibleMappings[responsible] || [];
+    if (current.includes(phone.trim())) return;
+    
+    const newMappings = { 
+      ...whatsappResponsibleMappings, 
+      [responsible]: [...current, phone.trim()] 
+    };
+    setWhatsappResponsibleMappings(newMappings);
+    onUpdateSettings({ whatsappResponsibleMappings: newMappings });
+  };
+
+  const handleRemoveResponsibleMapping = (responsible: string, phone: string) => {
+    const current = whatsappResponsibleMappings[responsible] || [];
+    const newMappings = { 
+      ...whatsappResponsibleMappings, 
+      [responsible]: current.filter(p => p !== phone) 
+    };
+    setWhatsappResponsibleMappings(newMappings);
+    onUpdateSettings({ whatsappResponsibleMappings: newMappings });
   };
 
   const handleSaveGeneral = async () => {
@@ -656,6 +708,111 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               ))}
               {whatsappResponsiblesList.length === 0 && (
                 <p className="text-sm text-zinc-400 italic">Nenhum número configurado para responsáveis.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Associação de WhatsApp por Cliente</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe números específicos a cada cliente para notificações direcionadas.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {([...CLIENTS, ...customClients].sort()).map(client => (
+                <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-3">
+                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white">{client}</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {whatsappClientMappings[client]?.map(phone => (
+                      <span key={phone} className="bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-2 border border-zinc-200 dark:border-zinc-600">
+                        {phone}
+                        <button onClick={() => handleRemoveClientMapping(client, phone)} className="text-zinc-400 hover:text-red-500">
+                          <Plus className="w-3 h-3 rotate-45" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Número..."
+                      className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleAddClientMapping(client, e.currentTarget.value);
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
+                    <button 
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        handleAddClientMapping(client, input.value);
+                        input.value = "";
+                      }}
+                      className="p-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:opacity-90"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <User className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Associação de WhatsApp por Responsável</h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe números específicos a cada responsável para alertas de SLA direcionados.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {allResponsibles.map(resp => (
+                <div key={resp} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-3">
+                  <h4 className="text-sm font-bold text-zinc-900 dark:text-white">{resp}</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {whatsappResponsibleMappings[resp]?.map(phone => (
+                      <span key={phone} className="bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-2 border border-zinc-200 dark:border-zinc-600">
+                        {phone}
+                        <button onClick={() => handleRemoveResponsibleMapping(resp, phone)} className="text-zinc-400 hover:text-red-500">
+                          <Plus className="w-3 h-3 rotate-45" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Número..."
+                      className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all dark:text-white"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleAddResponsibleMapping(resp, e.currentTarget.value);
+                          e.currentTarget.value = "";
+                        }
+                      }}
+                    />
+                    <button 
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        handleAddResponsibleMapping(resp, input.value);
+                        input.value = "";
+                      }}
+                      className="p-1.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded-lg hover:opacity-90"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {allResponsibles.length === 0 && (
+                <p className="text-sm text-zinc-400 italic col-span-2">Nenhum responsável cadastrado nos clientes.</p>
               )}
             </div>
           </div>
