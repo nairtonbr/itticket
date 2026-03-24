@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star } from "lucide-react";
+import DatePicker, { registerLocale } from "react-datepicker";
 import { ptBR } from "date-fns/locale";
 import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
+registerLocale("pt-BR", ptBR);
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
 import { parseSlaToMs } from "../utils/slaUtils";
@@ -30,6 +32,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [priority, setPriority] = useState<TicketPriority | "">("");
   const [responsible, setResponsible] = useState("");
   const [sla, setSla] = useState("");
+  const [slaDate, setSlaDate] = useState<Date | null>(null);
   const [isImportant, setIsImportant] = useState(false);
   const [totalHours, setTotalHours] = useState<number>(0);
   const [liveElapsed, setLiveElapsed] = useState(0);
@@ -106,6 +109,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
           }
         }
         setSla(initialSla);
+        setSlaDate(initialSla ? new Date(initialSla) : null);
         
         setIsImportant(ticket.isImportant || false);
         setTotalHours(ticket.totalHours || 0);
@@ -144,16 +148,19 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     
     // Validation
     const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Título é obrigatório";
+    if (!category) newErrors.category = "Categoria é obrigatória";
+    if (!status) newErrors.status = "Status é obrigatório";
+    
+    if (user?.role === "client" && user.associatedClient === "Todos" && !client) {
+      newErrors.client = "Cliente é obrigatório";
+    }
+    
     if (user?.role !== "client") {
-      if (!title.trim()) newErrors.title = "Título é obrigatório";
       if (!client) newErrors.client = "Cliente é obrigatório";
-      if (!category) newErrors.category = "Categoria é obrigatória";
-      if (!status) newErrors.status = "Status é obrigatório";
       if (!sla.trim()) newErrors.sla = "SLA / Prazo é obrigatório";
       if (!priority) newErrors.priority = "Prioridade é obrigatória";
       if (!responsible) newErrors.responsible = "Responsável é obrigatório";
-    } else {
-      if (!status) newErrors.status = "Status é obrigatório";
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -165,21 +172,22 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
     setErrors({});
     setIsSubmitting(true);
     
-    const data = user?.role === "client" ? {
-      status: ticket ? status : "Aberto",
-    } : {
+    const data: any = {
       title,
       description,
       client: user?.role === "client" && user.associatedClient !== "Todos" ? user.associatedClient : client,
       status: ticket ? status : "Aberto",
       category: category || undefined,
-      priority: priority || undefined,
-      totalHours,
-      responsible,
-      sla,
-      isImportant,
       attachments
     };
+
+    if (user?.role !== "client") {
+      data.priority = priority || undefined;
+      data.totalHours = totalHours;
+      data.responsible = responsible;
+      data.sla = sla;
+      data.isImportant = isImportant;
+    }
 
     if (ticket) {
       await onUpdate(ticket.id, data);
@@ -327,7 +335,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               <input 
                 type="text" 
                 value={title}
-                disabled={user?.role === "client"}
                 onChange={(e) => {
                   setTitle(e.target.value.toUpperCase());
                   if (errors.title) setErrors(prev => ({ ...prev, title: "" }));
@@ -340,7 +347,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               {errors.title && <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">{errors.title}</p>}
               <textarea 
                 value={description}
-                disabled={user?.role === "client"}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Adicione uma descrição para este chamado..."
                 className="w-full text-sm text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 min-h-[100px]"
@@ -423,7 +429,6 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                         <div className="flex-1 relative group">
                           <select 
                             value={category}
-                            disabled={user?.role === "client"}
                             onChange={(e) => {
                               setCategory(e.target.value);
                               if (errors.category) setErrors(prev => ({ ...prev, category: "" }));
@@ -459,15 +464,19 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                           SLA / Prazo <span className="text-red-500">*</span>:
                         </span>
                         <div className="flex-1">
-                          <input 
-                            type="datetime-local"
+                          <DatePicker 
+                            selected={slaDate}
                             disabled={user?.role === "client"}
-                            value={sla}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setSla(val);
+                            onChange={(date: Date | null) => {
+                              setSlaDate(date);
+                              setSla(date ? date.toISOString().slice(0, 16) : "");
                               if (errors.sla) setErrors(prev => ({ ...prev, sla: "" }));
                             }}
+                            showTimeSelect
+                            timeFormat="HH:mm"
+                            timeIntervals={15}
+                            dateFormat="dd/MM/yyyy HH:mm"
+                            locale="pt-BR"
                             className={`w-full bg-zinc-50 dark:bg-zinc-800/50 border rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-zinc-300 dark:placeholder:text-zinc-600 ${
                               errors.sla ? "border-red-500 text-red-500" : "border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white"
                             }`}

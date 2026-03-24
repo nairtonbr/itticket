@@ -606,7 +606,7 @@ export default function App() {
         status: "Aberto",
         title: ticketData.title?.toUpperCase(),
         client:
-          userProfile?.role === "client"
+          userProfile?.role === "client" && userProfile.associatedClient !== "Todos"
             ? userProfile.associatedClient
             : ticketData.client?.trim(),
         createdAt: now,
@@ -650,6 +650,7 @@ export default function App() {
 
       if (
         userProfile?.role === "client" &&
+        userProfile.associatedClient !== "Todos" &&
         normalize(originalTicket?.client) !== normalize(userProfile.associatedClient)
       ) {
         toast.error("Você não tem permissão para editar este ticket");
@@ -657,7 +658,7 @@ export default function App() {
       }
 
       if (userProfile?.role === "client") {
-        const allowedFields = ["title", "description", "updates", "attachments", "status"];
+        const allowedFields = ["title", "description", "updates", "attachments", "status", "category", "client"];
 
         Object.keys(updates).forEach(key => {
           if (!allowedFields.includes(key)) {
@@ -812,7 +813,7 @@ export default function App() {
     // Role-based filtering
     if (userProfile?.role === "client") {
       const clientName = userProfile.associatedClient;
-      if (clientName) {
+      if (clientName && clientName !== "Todos") {
         baseTickets = baseTickets.filter(
           t => normalize(t.client) === normalize(clientName)
         );
@@ -890,7 +891,7 @@ export default function App() {
     if (userProfile?.role === "client") {
       return userProfile.associatedClient && userProfile.associatedClient !== "Todos" 
         ? [userProfile.associatedClient] 
-        : [];
+        : allClients;
     }
     return allClients;
   }, [userProfile, allClients]);
