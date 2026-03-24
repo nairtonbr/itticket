@@ -657,7 +657,7 @@ export default function App() {
       }
 
       if (userProfile?.role === "client") {
-        const allowedFields = ["title", "description"];
+        const allowedFields = ["title", "description", "updates", "attachments"];
 
         Object.keys(updates).forEach(key => {
           if (!allowedFields.includes(key)) {
@@ -747,7 +747,9 @@ export default function App() {
       const finalTicket = { ...originalTicket, ...formattedUpdates } as Ticket;
       
       // Enviar notificações em segundo plano para não travar a UI
-      if (settings.whatsappEnabled !== false) {
+      const isSlaUpdate = Object.keys(updates).every(key => ['sla', 'slaNotified', 'slaNotifiedAt'].includes(key));
+
+      if (settings.whatsappEnabled !== false && !isSlaUpdate) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const isCommentAdded = updates.updates !== undefined && (updates.updates.length > (originalTicket?.updates?.length || 0));
         
@@ -762,7 +764,7 @@ export default function App() {
         }).catch(console.error);
       }
 
-      if (settings.webhookEnabled !== false && settings.webhookUrl) {
+      if (settings.webhookEnabled !== false && settings.webhookUrl && !isSlaUpdate) {
         const isStatusChange = updates.status !== undefined && updates.status !== originalTicket?.status;
         const webhookType = isStatusChange ? "action" : "update";
         sendWebhook(finalTicket, settings, webhookType).catch(console.error);
@@ -832,7 +834,7 @@ export default function App() {
       }
 
       const matchesStatus = statusFilter === "Total" 
-        ? t.status !== "Resolvido" 
+        ? true 
         : statusFilter === "Aguardando" 
           ? (t.status === "Aguardando Cliente" || t.status === "Aguardando Terceiros")
           : statusFilter === "SLA Crítico"
@@ -1338,7 +1340,7 @@ export default function App() {
                 <div className="flex justify-center">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
                   {[
-                    { label: "Total", value: ticketsByTab.filter(t => !t.archived && t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
+                    { label: "Total", value: ticketsByTab.filter(t => !t.archived).length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
                     { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
                     { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
