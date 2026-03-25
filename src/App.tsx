@@ -1388,7 +1388,7 @@ export default function App() {
                 <div className="flex justify-center">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
                   {[
-                    { label: "Total", value: ticketsByTab.filter(t => !t.archived).length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
+                    { label: "Total", value: ticketsByTab.filter(t => !t.archived && t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
                     { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
                     { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
