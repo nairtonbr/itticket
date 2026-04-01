@@ -64,6 +64,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
   const events = useMemo<CalendarEvent[]>(() => {
     const scheduleEvents: CalendarEvent[] = schedules.map(s => {
       const start = new Date(s.date);
+      // Set to 1 second after midnight to appear after tickets
+      start.setHours(0, 0, 1, 0);
+      
       const end = s.endDate ? new Date(s.endDate) : new Date(s.date);
       if (s.endDate) {
         end.setHours(23, 59, 59, 999);
@@ -75,6 +78,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         title: `${s.analyst} (${s.shift})`,
         start,
         end,
+        allDay: true,
         resource: { ...s, type: 'schedule' as const }
       };
     });
@@ -84,11 +88,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         const deadlineDate = getTicketDeadline(t);
         if (!deadlineDate || isNaN(deadlineDate.getTime())) return null;
 
+        // Set to exactly midnight to appear before schedules
+        const start = new Date(deadlineDate);
+        start.setHours(0, 0, 0, 0);
+        
+        const end = new Date(deadlineDate);
+        end.setHours(0, 0, 0, 0);
+
         return {
           id: t.id,
           title: `#${t.id} (${t.responsible}) (${t.client})`,
-          start: deadlineDate,
-          end: deadlineDate,
+          start,
+          end,
           allDay: true,
           resource: { ...t, type: 'ticket' as const }
         };
@@ -96,7 +107,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
 
     const filteredTicketEvents = ticketEvents.filter((e): e is CalendarEvent => e !== null);
 
-    return [...scheduleEvents, ...filteredTicketEvents];
+    // Invert order: tickets first, then schedules
+    return [...filteredTicketEvents, ...scheduleEvents];
   }, [schedules, tickets]);
 
   const handleAddSchedule = async () => {
@@ -167,12 +179,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
           startAccessor="start"
           endAccessor="end"
           allDayAccessor="allDay"
-          style={{ height: 700 }}
+          style={{ height: 850 }}
           eventPropGetter={(event) => ({
             style: {
               backgroundColor: 'transparent',
               border: 'none',
-              padding: '1px 0',
+              padding: '0.5px 0',
               display: 'block'
             }
           })}
@@ -245,8 +257,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               dateHeader: ({ label, date }) => {
                 const isToday = moment(date).isSame(moment(), 'day');
                 return (
-                  <div className={`flex flex-col items-end p-2 ${isToday ? "text-blue-600 dark:text-blue-400" : ""}`}>
-                    <span className={`text-xs font-black ${isToday ? "scale-125 origin-right" : "opacity-50"}`}>
+                  <div className={`flex items-center justify-end p-1 ${isToday ? "text-blue-600 dark:text-blue-400" : ""}`}>
+                    <span className={`text-[10px] font-black ${isToday ? "scale-110" : "opacity-40"}`}>
                       {label}
                     </span>
                   </div>
@@ -257,25 +269,25 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               const res = event.resource;
               if (res.type === 'ticket') {
                 const priorityColors = {
-                  "Urgente": "bg-rose-600 border-rose-700 text-white",
-                  "Alta": "bg-orange-600 border-orange-700 text-white",
-                  "Média": "bg-blue-600 border-blue-700 text-white",
-                  "Baixa": "bg-zinc-600 border-zinc-700 text-white"
+                  "Urgente": "bg-rose-600 border-rose-700/50 text-white",
+                  "Alta": "bg-orange-600 border-orange-700/50 text-white",
+                  "Média": "bg-blue-600 border-blue-700/50 text-white",
+                  "Baixa": "bg-zinc-600 border-zinc-700/50 text-white"
                 };
                 
-                const colorClass = res.priority ? priorityColors[res.priority] : "bg-blue-600 border-blue-700 text-white";
+                const colorClass = res.priority ? priorityColors[res.priority] : "bg-blue-600 border-blue-700/50 text-white";
 
                 return (
-                  <div className={`group relative px-2 py-1 rounded-md text-[9px] font-bold shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden flex items-center gap-1.5 border ${colorClass}`}>
-                    <div className="flex shrink-0 items-center justify-center bg-white/20 rounded px-0.5 font-black">
+                  <div className={`group relative px-1.5 py-0.5 rounded-sm text-[8px] font-bold shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden flex items-center gap-1 border ${colorClass}`}>
+                    <div className="flex shrink-0 items-center justify-center bg-white/20 rounded-xs px-0.5 font-black text-[7px]">
                       #{res.id}
                     </div>
-                    <span className="truncate opacity-90">{res.client}</span>
+                    <span className="truncate opacity-95 tracking-tight">{res.client}</span>
                     {res.priority === "Urgente" && (
-                      <ShieldAlert className="w-2.5 h-2.5 ml-auto shrink-0 animate-pulse" />
+                      <ShieldAlert className="w-2 h-2 ml-auto shrink-0 animate-pulse" />
                     )}
-                    <div className="ml-auto shrink-0 opacity-70">
-                      <Clock className="w-2 h-2" />
+                    <div className="ml-auto shrink-0 opacity-60">
+                      <Clock className="w-1.5 h-1.5" />
                     </div>
                   </div>
                 );
@@ -303,13 +315,16 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               };
 
               return (
-                <div className={`group relative px-2 py-1 rounded-md text-[10px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
-                  <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
-                      <span className="truncate tracking-tight opacity-80">{res.analyst}</span>
+                <div className={`group relative px-1.5 py-0.5 rounded-sm text-[9px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1 truncate">
+                      <div className={`w-1 h-1 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
+                      <span className="truncate tracking-tight opacity-90">{res.analyst}</span>
+                      {res.shift === "Plantão" && (
+                        <span className="px-0.5 rounded-xs bg-white/20 text-[7px] font-black uppercase tracking-tighter shrink-0">Plantão</span>
+                      )}
                     </div>
-                    <div className="opacity-20 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="opacity-10 group-hover:opacity-100 transition-opacity shrink-0">
                       {shiftIcons[res.shift as keyof typeof shiftIcons]}
                     </div>
                   </div>
