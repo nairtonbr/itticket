@@ -168,6 +168,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
           endAccessor="end"
           allDayAccessor="allDay"
           style={{ height: 700 }}
+          eventPropGetter={(event) => ({
+            style: {
+              backgroundColor: 'transparent',
+              border: 'none',
+              padding: '1px 0',
+              display: 'block'
+            }
+          })}
           onSelectEvent={(event) => {
             if (event.resource.type === 'ticket') {
               onTicketClick(event.resource);
@@ -248,21 +256,26 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
             event: ({ event }) => {
               const res = event.resource;
               if (res.type === 'ticket') {
+                const priorityColors = {
+                  "Urgente": "bg-rose-600 border-rose-700 text-white",
+                  "Alta": "bg-orange-600 border-orange-700 text-white",
+                  "Média": "bg-blue-600 border-blue-700 text-white",
+                  "Baixa": "bg-zinc-600 border-zinc-700 text-white"
+                };
+                
+                const colorClass = res.priority ? priorityColors[res.priority] : "bg-blue-600 border-blue-700 text-white";
+
                 return (
-                  <div className="group relative px-2 py-1.5 rounded-lg text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 border-y border-r border-blue-100 dark:border-blue-800/50 text-zinc-700 dark:text-zinc-300 transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="flex items-center gap-0.5 bg-blue-100 dark:bg-blue-800/50 px-1 rounded text-[9px] font-black text-blue-700 dark:text-blue-300">
-                        <Hash className="w-2.5 h-2.5" />
-                        {res.id}
-                      </div>
-                      <div className="flex items-center gap-0.5 bg-white/50 dark:bg-zinc-800/50 px-1 rounded text-[9px] font-black border border-blue-200/30 dark:border-blue-700/30">
-                        <User className="w-2.5 h-2.5 text-blue-500" />
-                        {res.responsible}
-                      </div>
-                      <div className="flex items-center gap-0.5 bg-white/50 dark:bg-zinc-800/50 px-1 rounded text-[9px] font-black border border-blue-200/30 dark:border-blue-700/30">
-                        <Briefcase className="w-2.5 h-2.5 text-amber-500" />
-                        {res.client}
-                      </div>
+                  <div className={`group relative px-2 py-1 rounded-md text-[9px] font-bold shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden flex items-center gap-1.5 border ${colorClass}`}>
+                    <div className="flex shrink-0 items-center justify-center bg-white/20 rounded px-0.5 font-black">
+                      #{res.id}
+                    </div>
+                    <span className="truncate opacity-90">{res.client}</span>
+                    {res.priority === "Urgente" && (
+                      <ShieldAlert className="w-2.5 h-2.5 ml-auto shrink-0 animate-pulse" />
+                    )}
+                    <div className="ml-auto shrink-0 opacity-70">
+                      <Clock className="w-2 h-2" />
                     </div>
                   </div>
                 );
@@ -276,27 +289,27 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               };
 
               const shiftColors = {
-                "Manhã": "bg-blue-500/10 text-blue-600 border-blue-200/50 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-800/50",
-                "Tarde": "bg-orange-500/10 text-orange-600 border-orange-200/50 dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-800/50",
-                "Noite": "bg-indigo-500/10 text-indigo-600 border-indigo-200/50 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border-indigo-800/50",
-                "Plantão": "bg-rose-500/10 text-rose-600 border-rose-200/50 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-800/50"
+                "Manhã": "bg-blue-500/5 text-blue-600/70 border-blue-200/30 dark:bg-blue-500/10 dark:text-blue-400/70 dark:border-blue-800/30",
+                "Tarde": "bg-orange-500/5 text-orange-600/70 border-orange-200/30 dark:bg-orange-500/10 dark:text-orange-400/70 dark:border-orange-800/30",
+                "Noite": "bg-indigo-500/5 text-indigo-600/70 border-indigo-200/30 dark:bg-indigo-500/10 dark:text-indigo-400/70 dark:border-indigo-800/30",
+                "Plantão": "bg-rose-500/5 text-rose-600/70 border-rose-200/30 dark:bg-rose-500/10 dark:text-rose-400/70 dark:border-rose-800/30"
               };
 
               const dotColors = {
-                "Manhã": "bg-blue-500",
-                "Tarde": "bg-orange-500",
-                "Noite": "bg-indigo-500",
-                "Plantão": "bg-rose-500"
+                "Manhã": "bg-blue-500/50",
+                "Tarde": "bg-orange-500/50",
+                "Noite": "bg-indigo-500/50",
+                "Plantão": "bg-rose-500/50"
               };
 
               return (
-                <div className={`group relative px-3 py-2 rounded-xl text-[11px] font-bold border transition-all hover:shadow-lg hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 truncate">
-                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
-                      <span className="truncate tracking-tight">{res.analyst}</span>
+                <div className={`group relative px-2 py-1 rounded-md text-[10px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
+                      <span className="truncate tracking-tight opacity-80">{res.analyst}</span>
                     </div>
-                    <div className="opacity-40 group-hover:opacity-100 transition-opacity">
+                    <div className="opacity-20 group-hover:opacity-100 transition-opacity shrink-0">
                       {shiftIcons[res.shift as keyof typeof shiftIcons]}
                     </div>
                   </div>
@@ -307,9 +320,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                         e.stopPropagation();
                         handleDeleteScheduleClick(event.id as string);
                       }}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-zinc-800 rounded-full shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-red-500 hover:text-red-600 border border-zinc-100 dark:border-zinc-700 z-20 hover:scale-110 active:scale-90"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white dark:bg-zinc-800 rounded-full shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-red-500 hover:text-red-600 border border-zinc-100 dark:border-zinc-700 z-20 hover:scale-110 active:scale-90"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-2.5 h-2.5" />
                     </button>
                   )}
                 </div>
