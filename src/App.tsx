@@ -837,7 +837,7 @@ export default function App() {
   const handleCreateSchedule = async (scheduleData: any) => {
     try {
       await addDoc(collection(db, "schedules"), scheduleData);
-      toast.success("Escala agendada!");
+      toast.success("Agenda salva!");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "schedules");
     }
@@ -846,7 +846,7 @@ export default function App() {
   const handleDeleteSchedule = async (id: string) => {
     try {
       await deleteDoc(doc(db, "schedules", id));
-      toast.success("Escala removida!");
+      toast.success("Agenda removida!");
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `schedules/${id}`);
     }
@@ -1177,7 +1177,7 @@ export default function App() {
                     className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200 group ${activeTab === "schedule" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"}`}
                   >
                     <CalendarIcon className={`w-5 h-5 ${activeTab === "schedule" ? "text-blue-600 dark:text-blue-400" : "text-zinc-400 group-hover:text-zinc-600"}`} />
-                    <span className="font-bold text-sm">Escala</span>
+                    <span className="font-bold text-sm">Agenda</span>
                   </button>
                 </div>
               </div>

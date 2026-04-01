@@ -128,7 +128,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">Escala de Analistas</h2>
+          <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">Agenda (Chamados e Escala de Analistas)</h2>
           <p className="text-zinc-500 dark:text-zinc-400 font-medium">Cronograma de plantões e turnos da equipe IT</p>
         </div>
 
@@ -138,7 +138,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
-            Nova Escala
+            Nova Agenda
           </button>
         )}
       </div>
@@ -249,18 +249,18 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               const res = event.resource;
               if (res.type === 'ticket') {
                 return (
-                  <div className="group relative px-2 py-1.5 rounded-lg text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all hover:shadow-md hover:-translate-y-0.5">
+                  <div className="group relative px-2 py-1.5 rounded-lg text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 border-y border-r border-blue-100 dark:border-blue-800/50 text-zinc-700 dark:text-zinc-300 transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <div className="flex items-center gap-0.5 bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-[9px] font-black">
+                      <div className="flex items-center gap-0.5 bg-blue-100 dark:bg-blue-800/50 px-1 rounded text-[9px] font-black text-blue-700 dark:text-blue-300">
                         <Hash className="w-2.5 h-2.5" />
                         {res.id}
                       </div>
-                      <div className="flex items-center gap-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1 rounded text-[9px] font-black">
-                        <User className="w-2.5 h-2.5" />
+                      <div className="flex items-center gap-0.5 bg-white/50 dark:bg-zinc-800/50 px-1 rounded text-[9px] font-black border border-blue-200/30 dark:border-blue-700/30">
+                        <User className="w-2.5 h-2.5 text-blue-500" />
                         {res.responsible}
                       </div>
-                      <div className="flex items-center gap-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1 rounded text-[9px] font-black">
-                        <Briefcase className="w-2.5 h-2.5" />
+                      <div className="flex items-center gap-0.5 bg-white/50 dark:bg-zinc-800/50 px-1 rounded text-[9px] font-black border border-blue-200/30 dark:border-blue-700/30">
+                        <Briefcase className="w-2.5 h-2.5 text-amber-500" />
                         {res.client}
                       </div>
                     </div>
@@ -327,7 +327,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl border border-zinc-100 dark:border-zinc-800"
           >
-            <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-6">Agendar Escala</h3>
+            <h3 className="text-2xl font-black text-zinc-900 dark:text-white mb-6">Agendar</h3>
             
             <div className="space-y-6">
               <div className="space-y-2">
