@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star } from "lucide-react";
+import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSquare, Plus, Trash2, Paperclip, FileText, Download as DownloadIcon, Pencil, Save, Loader2, ChevronDown, History, Star, ChevronLeft } from "lucide-react";
 import DatePicker, { registerLocale } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ptBR } from "date-fns/locale";
@@ -276,12 +276,21 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
       >
         {/* Header */}
         <div className="px-8 py-4 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
-          <div className="flex items-center gap-3">
-            {ticket && (
-              <>
-                <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
-                  #{ticket.id}
-                </span>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={onClose}
+              className="flex items-center gap-1.5 text-zinc-400 hover:text-blue-600 transition-colors group"
+            >
+              <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+              <span className="text-[10px] font-bold uppercase tracking-widest">Voltar</span>
+            </button>
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800" />
+            <div className="flex items-center gap-3">
+              {ticket && (
+                <>
+                  <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
+                    #{ticket.id}
+                  </span>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700`}>
                   {ticket.status}
                 </span>
@@ -301,7 +310,8 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Novo Chamado</h2>
             )}
           </div>
-          <div className="flex items-center gap-2">
+        </div>
+        <div className="flex items-center gap-2">
             <button 
               onClick={() => setIsImportant(!isImportant)}
               className={`p-2 rounded-full transition-all ${isImportant ? "text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20" : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"}`}

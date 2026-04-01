@@ -315,7 +315,7 @@ export default function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Keyboard Shortcuts
+  // Searching for handleDeleteTicket and "Resolvidos" label
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Alt + N: New Ticket
@@ -1393,12 +1393,12 @@ export default function App() {
                     { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
                     { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
                     { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros" && !t.archived).length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
-                    { label: "Resolvidos", value: ticketsByTab.filter(t => {
+                    { label: "RESOLVIDOS ULTIMOS 2d", value: ticketsByTab.filter(t => {
                       if (t.status !== "Resolvido" || t.archived) return false;
                       const date = getFirestoreDate(t.updatedAt || t.createdAt);
                       if (!date) return false;
-                      const now = new Date();
-                      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+                      const twoDaysAgo = subDays(new Date(), 2);
+                      return date >= twoDaysAgo;
                     }).length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" }
                   ].map((stat, i) => (
                     <motion.button
@@ -1408,7 +1408,7 @@ export default function App() {
                       transition={{ delay: i * 0.05 }}
                       onClick={() => {
                         if (stat.label === "Total") setStatusFilter("Total");
-                        else if (stat.label === "Resolvidos") setStatusFilter("Resolvido");
+                        else if (stat.label === "RESOLVIDOS ULTIMOS 2d") setStatusFilter("Resolvido");
                         else if (stat.label === "Em Aberto") setStatusFilter("Aberto");
                         else if (stat.label === "Em Andamento") setStatusFilter("Em Andamento");
                         else if (stat.label === "Aguardando Cliente") setStatusFilter("Aguardando Cliente");
@@ -1416,7 +1416,7 @@ export default function App() {
                       }}
                       className={`p-6 rounded-[2rem] border transition-all duration-500 text-left group relative overflow-hidden flex flex-col justify-between h-40 ${
                         (statusFilter === "Total" && stat.label === "Total") ||
-                        (statusFilter === "Resolvido" && stat.label === "Resolvidos") ||
+                        (statusFilter === "Resolvido" && stat.label === "RESOLVIDOS ULTIMOS 2d") ||
                         (statusFilter === "Aberto" && stat.label === "Em Aberto") ||
                         (statusFilter === "Em Andamento" && stat.label === "Em Andamento") ||
                         (statusFilter === "Aguardando Cliente" && stat.label === "Aguardando Cliente") ||
