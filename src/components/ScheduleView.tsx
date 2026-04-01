@@ -18,6 +18,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import { Ticket } from "../types";
+import { getTicketDeadline } from "../utils/slaUtils";
 
 moment.locale('pt-br');
 const localizer = momentLocalizer(moment);
@@ -45,6 +46,7 @@ type CalendarEvent = {
   title: string;
   start: Date;
   end: Date;
+  allDay?: boolean;
   resource: (ScheduleEntry & { type: 'schedule' }) | (Ticket & { type: 'ticket' });
 };
 
@@ -73,22 +75,28 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         title: `${s.analyst} (${s.shift})`,
         start,
         end,
-        resource: { ...s, type: 'schedule' }
+        resource: { ...s, type: 'schedule' as const }
       };
     });
 
-    const ticketEvents: CalendarEvent[] = tickets.map(t => {
-      const date = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt);
-      return {
-        id: t.id,
-        title: `#${t.id} (${t.responsible}) (${t.client})`,
-        start: date,
-        end: date,
-        resource: { ...t, type: 'ticket' }
-      };
-    });
+    const ticketEvents: (CalendarEvent | null)[] = tickets
+      .map(t => {
+        const deadlineDate = getTicketDeadline(t);
+        if (!deadlineDate || isNaN(deadlineDate.getTime())) return null;
 
-    return [...scheduleEvents, ...ticketEvents];
+        return {
+          id: t.id,
+          title: `#${t.id} (${t.responsible}) (${t.client})`,
+          start: deadlineDate,
+          end: deadlineDate,
+          allDay: true,
+          resource: { ...t, type: 'ticket' as const }
+        };
+      });
+
+    const filteredTicketEvents = ticketEvents.filter((e): e is CalendarEvent => e !== null);
+
+    return [...scheduleEvents, ...filteredTicketEvents];
   }, [schedules, tickets]);
 
   const handleAddSchedule = async () => {
@@ -158,6 +166,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
           events={events}
           startAccessor="start"
           endAccessor="end"
+          allDayAccessor="allDay"
           style={{ height: 700 }}
           onSelectEvent={(event) => {
             if (event.resource.type === 'ticket') {

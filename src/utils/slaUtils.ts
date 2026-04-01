@@ -172,3 +172,37 @@ export const getSlaProgress = (ticket: Ticket): number => {
   const progress = (elapsed / slaMs) * 100;
   return Math.min(Math.max(progress, 0), 100);
 };
+
+export const getTicketDeadline = (ticket: Ticket): Date | null => {
+  if (!ticket.createdAt || !ticket.sla) return null;
+
+  let createdAtMs: number = 0;
+  try {
+    if (typeof ticket.createdAt.toDate === 'function') {
+      createdAtMs = ticket.createdAt.toDate().getTime();
+    } else if (ticket.createdAt instanceof Date) {
+      createdAtMs = ticket.createdAt.getTime();
+    } else if (typeof ticket.createdAt === 'number') {
+      createdAtMs = ticket.createdAt;
+    } else if (ticket.createdAt && typeof ticket.createdAt === 'object' && 'seconds' in ticket.createdAt) {
+      createdAtMs = (ticket.createdAt as any).seconds * 1000;
+    } else if (typeof ticket.createdAt === 'string') {
+      createdAtMs = new Date(ticket.createdAt).getTime();
+    }
+  } catch (e) {
+    return null;
+  }
+
+  if (!createdAtMs || isNaN(createdAtMs)) return null;
+
+  const isDateString = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(ticket.sla);
+  if (isDateString) {
+    const date = new Date(ticket.sla);
+    return isNaN(date.getTime()) ? null : date;
+  }
+
+  const slaMs = parseSlaToMs(ticket.sla);
+  if (slaMs === 0) return null;
+
+  return new Date(createdAtMs + slaMs);
+};
