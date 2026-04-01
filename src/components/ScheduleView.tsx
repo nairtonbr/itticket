@@ -283,6 +283,9 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                       #{res.id}
                     </div>
                     <span className="truncate opacity-95 tracking-tight">{res.client}</span>
+                    <div className="px-1 rounded-xs bg-black/10 text-[7px] font-black uppercase tracking-tighter shrink-0 border border-white/5">
+                      {res.responsible}
+                    </div>
                     {res.priority === "Urgente" && (
                       <ShieldAlert className="w-2 h-2 ml-auto shrink-0 animate-pulse" />
                     )}
