@@ -1384,6 +1384,11 @@ export default function App() {
                 onAdd={handleCreateSchedule}
                 onDelete={handleDeleteSchedule}
                 users={users} 
+                tickets={tickets}
+                onTicketClick={(ticket) => {
+                  setSelectedTicket(ticket);
+                  setIsModalOpen(true);
+                }}
               />
             ) : (
               <>

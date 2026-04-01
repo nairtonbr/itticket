@@ -9,11 +9,15 @@ import {
   Sun,
   CloudSun,
   Moon,
-  ShieldAlert
+  ShieldAlert,
+  Hash,
+  Briefcase,
+  Tag as TagIcon
 } from "lucide-react";
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/pt-br';
+import { Ticket } from "../types";
 
 moment.locale('pt-br');
 const localizer = momentLocalizer(moment);
@@ -32,9 +36,19 @@ interface ScheduleViewProps {
   onAdd: (entry: any) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   users: any[];
+  tickets: Ticket[];
+  onTicketClick: (ticket: Ticket) => void;
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, onAdd, onDelete, users }) => {
+type CalendarEvent = {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: (ScheduleEntry & { type: 'schedule' }) | (Ticket & { type: 'ticket' });
+};
+
+export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, onAdd, onDelete, users, tickets, onTicketClick }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newEntry, setNewEntry] = useState<Partial<ScheduleEntry>>({
     shift: "Manhã",
@@ -45,11 +59,10 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
     return users.filter(u => u.role === "admin");
   }, [users]);
 
-  const events = useMemo(() => {
-    return schedules.map(s => {
+  const events = useMemo<CalendarEvent[]>(() => {
+    const scheduleEvents: CalendarEvent[] = schedules.map(s => {
       const start = new Date(s.date);
       const end = s.endDate ? new Date(s.endDate) : new Date(s.date);
-      // Ensure end date includes the full day if it's a multi-day event
       if (s.endDate) {
         end.setHours(23, 59, 59, 999);
       } else {
@@ -60,10 +73,23 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         title: `${s.analyst} (${s.shift})`,
         start,
         end,
-        resource: s
+        resource: { ...s, type: 'schedule' }
       };
     });
-  }, [schedules]);
+
+    const ticketEvents: CalendarEvent[] = tickets.map(t => {
+      const date = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt);
+      return {
+        id: t.id,
+        title: `#${t.id} (${t.responsible}) (${t.client})`,
+        start: date,
+        end: date,
+        resource: { ...t, type: 'ticket' }
+      };
+    });
+
+    return [...scheduleEvents, ...ticketEvents];
+  }, [schedules, tickets]);
 
   const handleAddSchedule = async () => {
     if (!newEntry.analyst || !newEntry.date || !newEntry.shift) return;
@@ -114,7 +140,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
           { label: "Manhã", color: "bg-blue-500", icon: <Sun className="w-3 h-3" /> },
           { label: "Tarde", color: "bg-orange-500", icon: <CloudSun className="w-3 h-3" /> },
           { label: "Noite", color: "bg-indigo-500", icon: <Moon className="w-3 h-3" /> },
-          { label: "Plantão", color: "bg-rose-500", icon: <ShieldAlert className="w-3 h-3" /> }
+          { label: "Plantão", color: "bg-rose-500", icon: <ShieldAlert className="w-3 h-3" /> },
+          { label: "Chamado", color: "bg-zinc-400", icon: <Hash className="w-3 h-3" /> }
         ].map(item => (
           <div key={item.label} className="flex items-center gap-2.5">
             <div className={`p-1.5 rounded-lg ${item.color} bg-opacity-10 text-opacity-100 ${item.color.replace('bg-', 'text-')}`}>
@@ -126,12 +153,17 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
       </div>
 
       <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <Calendar
+        <Calendar<CalendarEvent>
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
           style={{ height: 700 }}
+          onSelectEvent={(event) => {
+            if (event.resource.type === 'ticket') {
+              onTicketClick(event.resource);
+            }
+          }}
           messages={{
             next: "Próximo",
             previous: "Anterior",
@@ -205,6 +237,28 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               }
             },
             event: ({ event }) => {
+              const res = event.resource;
+              if (res.type === 'ticket') {
+                return (
+                  <div className="group relative px-2 py-1.5 rounded-lg text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 transition-all hover:shadow-md hover:-translate-y-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="flex items-center gap-0.5 bg-zinc-200 dark:bg-zinc-700 px-1 rounded text-[9px] font-black">
+                        <Hash className="w-2.5 h-2.5" />
+                        {res.id}
+                      </div>
+                      <div className="flex items-center gap-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1 rounded text-[9px] font-black">
+                        <User className="w-2.5 h-2.5" />
+                        {res.responsible}
+                      </div>
+                      <div className="flex items-center gap-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1 rounded text-[9px] font-black">
+                        <Briefcase className="w-2.5 h-2.5" />
+                        {res.client}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
               const shiftIcons = {
                 "Manhã": <Sun className="w-3 h-3" />,
                 "Tarde": <CloudSun className="w-3 h-3" />,
@@ -227,14 +281,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               };
 
               return (
-                <div className={`group relative px-3 py-2 rounded-xl text-[11px] font-bold border transition-all hover:shadow-lg hover:-translate-y-0.5 ${shiftColors[event.resource.shift as keyof typeof shiftColors]}`}>
+                <div className={`group relative px-3 py-2 rounded-xl text-[11px] font-bold border transition-all hover:shadow-lg hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 truncate">
-                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${dotColors[event.resource.shift as keyof typeof dotColors]}`} />
-                      <span className="truncate tracking-tight">{event.resource.analyst}</span>
+                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
+                      <span className="truncate tracking-tight">{res.analyst}</span>
                     </div>
                     <div className="opacity-40 group-hover:opacity-100 transition-opacity">
-                      {shiftIcons[event.resource.shift as keyof typeof shiftIcons]}
+                      {shiftIcons[res.shift as keyof typeof shiftIcons]}
                     </div>
                   </div>
                   
