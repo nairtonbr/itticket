@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { Ticket } from "../types";
+import { Ticket, AppSettings } from "../types";
 import { STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_DESCRIPTIONS } from "../constants";
 import { User as UserIcon, ChevronRight, MoreHorizontal, Loader2, MessageSquare, Paperclip, AlertCircle, Star } from "lucide-react";
 import { formatFirestoreDate } from "../utils/dateUtils";
@@ -8,9 +8,10 @@ import { getTicketSlaStatus, formatSlaDisplay } from "../utils/slaUtils";
 interface TicketListProps {
   tickets: Ticket[];
   onTicketClick: (ticket: Ticket) => void;
+  settings: AppSettings;
 }
 
-export default function TicketList({ tickets, onTicketClick }: TicketListProps) {
+export default function TicketList({ tickets, onTicketClick, settings }: TicketListProps) {
   if (tickets.length === 0) {
     return (
       <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden h-full flex flex-col items-center justify-center py-20 text-zinc-400">
@@ -89,8 +90,14 @@ export default function TicketList({ tickets, onTicketClick }: TicketListProps) 
 
                   <div className="w-[150px] px-6 py-4 shrink-0" title={STATUS_DESCRIPTIONS[ticket.status]}>
                     <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_COLORS[ticket.status]}`} />
-                      <span className={`text-[10px] font-black uppercase tracking-widest truncate ${STATUS_TEXT_COLORS[ticket.status]}`}>
+                      <div 
+                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${!settings.statusColors?.[ticket.status] ? STATUS_COLORS[ticket.status] : ""}`} 
+                        style={settings.statusColors?.[ticket.status] ? { backgroundColor: settings.statusColors[ticket.status] } : {}}
+                      />
+                      <span 
+                        className={`text-[10px] font-black uppercase tracking-widest truncate ${!settings.statusColors?.[ticket.status] ? STATUS_TEXT_COLORS[ticket.status] : ""}`}
+                        style={settings.statusColors?.[ticket.status] ? { color: settings.statusColors[ticket.status] } : {}}
+                      >
                         {ticket.status}
                       </span>
                     </div>

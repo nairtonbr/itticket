@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Ticket, TicketStatus } from "../types";
+import { Ticket, TicketStatus, AppSettings } from "../types";
 import { STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, STATUS_CARD_COLORS, STATUS_DESCRIPTIONS } from "../constants";
 import { Clock, User as UserIcon, AlertCircle, Loader2, MessageSquare, Paperclip, Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -12,6 +12,7 @@ interface KanbanBoardProps {
   tickets: Ticket[];
   onTicketClick: (ticket: Ticket) => void;
   onStatusChange: (ticketId: string, updates: Partial<Ticket>) => void;
+  settings: AppSettings;
 }
 
 interface KanbanColumnProps {
@@ -21,9 +22,10 @@ interface KanbanColumnProps {
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, status: TicketStatus) => void;
   onDragStart: (e: React.DragEvent, ticketId: string) => void;
+  settings: AppSettings;
 }
 
-function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDragStart }: KanbanColumnProps) {
+function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDragStart, settings }: KanbanColumnProps) {
   return (
     <div 
       className="flex-1 min-w-[280px] md:min-w-[320px] flex flex-col gap-4"
@@ -32,7 +34,10 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
     >
       <div className="flex items-center justify-between px-2" title={STATUS_DESCRIPTIONS[status]}>
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${STATUS_COLORS[status]}`} />
+          <div 
+            className={`w-2 h-2 rounded-full ${!settings.statusColors?.[status] ? STATUS_COLORS[status] : ""}`} 
+            style={settings.statusColors?.[status] ? { backgroundColor: settings.statusColors[status] } : {}}
+          />
           <h3 className="font-bold text-zinc-700 dark:text-zinc-300 uppercase tracking-wider text-[10px] md:text-xs">{status}</h3>
           <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded-full text-[10px] font-bold">
             {tickets.length}
@@ -129,7 +134,7 @@ function KanbanColumn({ status, tickets, onTicketClick, onDragOver, onDrop, onDr
   );
 }
 
-export default function KanbanBoard({ tickets, onTicketClick, onStatusChange }: KanbanBoardProps) {
+export default function KanbanBoard({ tickets, onTicketClick, onStatusChange, settings }: KanbanBoardProps) {
   const getTicketsByStatus = (status: TicketStatus) => {
     return tickets.filter(t => t.status === status);
   };
@@ -163,6 +168,7 @@ export default function KanbanBoard({ tickets, onTicketClick, onStatusChange }: 
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
+            settings={settings}
           />
         ))}
       </div>

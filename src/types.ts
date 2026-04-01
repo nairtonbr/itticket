@@ -70,6 +70,7 @@ export interface AppSettings {
   whatsappResponsibleMappings?: Record<string, string[]>; // ResponsibleName -> Phone numbers
   lastSlaCheckDate?: string; // YYYY-MM-DD
   disabledSlaClients?: string[];
+  statusColors?: Record<string, string>; // Status -> Hex Color
 }
 
 export type UserRole = "admin" | "user" | "client" | "pending";

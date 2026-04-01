@@ -5,7 +5,11 @@ import {
   Plus, 
   User, 
   Clock,
-  Trash2
+  Trash2,
+  Sun,
+  CloudSun,
+  Moon,
+  ShieldAlert
 } from "lucide-react";
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -105,13 +109,29 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
         )}
       </div>
 
-      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-6 border border-zinc-100 dark:border-zinc-800 shadow-sm">
+      <div className="flex flex-wrap gap-6 px-4 py-2 bg-zinc-50/50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 w-fit">
+        {[
+          { label: "Manhã", color: "bg-blue-500", icon: <Sun className="w-3 h-3" /> },
+          { label: "Tarde", color: "bg-orange-500", icon: <CloudSun className="w-3 h-3" /> },
+          { label: "Noite", color: "bg-indigo-500", icon: <Moon className="w-3 h-3" /> },
+          { label: "Plantão", color: "bg-rose-500", icon: <ShieldAlert className="w-3 h-3" /> }
+        ].map(item => (
+          <div key={item.label} className="flex items-center gap-2.5">
+            <div className={`p-1.5 rounded-lg ${item.color} bg-opacity-10 text-opacity-100 ${item.color.replace('bg-', 'text-')}`}>
+              {item.icon}
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{item.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
         <Calendar
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
-          style={{ height: 600 }}
+          style={{ height: 700 }}
           messages={{
             next: "Próximo",
             previous: "Anterior",
@@ -125,30 +145,113 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
             event: "Evento",
           }}
           components={{
-            event: ({ event }) => (
-              <div className={`group relative p-1 rounded text-[10px] font-bold ${
-                event.resource.shift === "Manhã" ? "bg-blue-100 text-blue-800" :
-                event.resource.shift === "Tarde" ? "bg-orange-100 text-orange-800" :
-                event.resource.shift === "Noite" ? "bg-indigo-100 text-indigo-800" :
-                "bg-red-100 text-red-800"
-              }`}>
-                <div className="flex items-center gap-1 truncate">
-                  <User className="w-3 h-3 shrink-0" />
-                  <span className="truncate">{event.resource.analyst}</span>
+            toolbar: (props) => {
+              const { label, onNavigate, onView, view } = props;
+              return (
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                    <button 
+                      onClick={() => onNavigate('PREV')}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
+                    >
+                      Anterior
+                    </button>
+                    <button 
+                      onClick={() => onNavigate('TODAY')}
+                      className="px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm transition-all active:scale-95"
+                    >
+                      Hoje
+                    </button>
+                    <button 
+                      onClick={() => onNavigate('NEXT')}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
+                    >
+                      Próximo
+                    </button>
+                  </div>
+
+                  <h3 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight uppercase">
+                    {label}
+                  </h3>
+
+                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                    {['month', 'week', 'day', 'agenda'].map((v) => (
+                      <button 
+                        key={v}
+                        onClick={() => onView(v as any)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                          view === v 
+                            ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm" 
+                            : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                        }`}
+                      >
+                        {v === 'month' ? 'Mês' : v === 'week' ? 'Semana' : v === 'day' ? 'Dia' : 'Agenda'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                {isAdmin && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteScheduleClick(event.id as string);
-                    }}
-                    className="absolute -top-1 -right-1 p-0.5 bg-white rounded shadow-md opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            )
+              );
+            },
+            month: {
+              dateHeader: ({ label, date }) => {
+                const isToday = moment(date).isSame(moment(), 'day');
+                return (
+                  <div className={`flex flex-col items-end p-2 ${isToday ? "text-blue-600 dark:text-blue-400" : ""}`}>
+                    <span className={`text-xs font-black ${isToday ? "scale-125 origin-right" : "opacity-50"}`}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              }
+            },
+            event: ({ event }) => {
+              const shiftIcons = {
+                "Manhã": <Sun className="w-3 h-3" />,
+                "Tarde": <CloudSun className="w-3 h-3" />,
+                "Noite": <Moon className="w-3 h-3" />,
+                "Plantão": <ShieldAlert className="w-3 h-3" />
+              };
+
+              const shiftColors = {
+                "Manhã": "bg-blue-500/10 text-blue-600 border-blue-200/50 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-800/50",
+                "Tarde": "bg-orange-500/10 text-orange-600 border-orange-200/50 dark:bg-orange-500/20 dark:text-orange-400 dark:border-orange-800/50",
+                "Noite": "bg-indigo-500/10 text-indigo-600 border-indigo-200/50 dark:bg-indigo-500/20 dark:text-indigo-400 dark:border-indigo-800/50",
+                "Plantão": "bg-rose-500/10 text-rose-600 border-rose-200/50 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-800/50"
+              };
+
+              const dotColors = {
+                "Manhã": "bg-blue-500",
+                "Tarde": "bg-orange-500",
+                "Noite": "bg-indigo-500",
+                "Plantão": "bg-rose-500"
+              };
+
+              return (
+                <div className={`group relative px-3 py-2 rounded-xl text-[11px] font-bold border transition-all hover:shadow-lg hover:-translate-y-0.5 ${shiftColors[event.resource.shift as keyof typeof shiftColors]}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 truncate">
+                      <div className={`w-2 h-2 rounded-full shrink-0 shadow-sm ${dotColors[event.resource.shift as keyof typeof dotColors]}`} />
+                      <span className="truncate tracking-tight">{event.resource.analyst}</span>
+                    </div>
+                    <div className="opacity-40 group-hover:opacity-100 transition-opacity">
+                      {shiftIcons[event.resource.shift as keyof typeof shiftIcons]}
+                    </div>
+                  </div>
+                  
+                  {isAdmin && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteScheduleClick(event.id as string);
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-zinc-800 rounded-full shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-red-500 hover:text-red-600 border border-zinc-100 dark:border-zinc-700 z-20 hover:scale-110 active:scale-90"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              );
+            }
           }}
         />
       </div>

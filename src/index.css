@@ -116,3 +116,80 @@
   @apply !border-t-white dark:!border-t-zinc-900;
 }
 
+/* React Big Calendar Customization */
+.rbc-calendar {
+  @apply font-sans text-zinc-900 dark:text-zinc-100;
+}
+
+.rbc-header {
+  @apply !border-zinc-100 dark:!border-zinc-800/30 !py-6 !text-[10px] !font-black !uppercase !tracking-widest !text-zinc-400 dark:!text-zinc-500 !bg-zinc-50/30 dark:!bg-zinc-800/20;
+}
+
+.rbc-month-view {
+  @apply !border-zinc-100 dark:!border-zinc-800/30 !rounded-[2.5rem] !overflow-hidden !bg-white dark:!bg-zinc-900/50 !backdrop-blur-sm;
+}
+
+.rbc-month-row {
+  @apply !border-zinc-100 dark:!border-zinc-800/30;
+}
+
+.rbc-day-bg {
+  @apply !border-zinc-100 dark:!border-zinc-800/30 transition-colors;
+}
+
+.rbc-day-bg:hover {
+  @apply !bg-zinc-50/50 dark:!bg-zinc-800/20;
+}
+
+.rbc-day-bg + .rbc-day-bg {
+  @apply !border-l !border-zinc-100 dark:!border-zinc-800/30;
+}
+
+.rbc-off-range-bg {
+  @apply !bg-zinc-50 dark:!bg-zinc-900/50;
+}
+
+.rbc-today {
+  @apply !bg-blue-500/5 dark:!bg-blue-500/10;
+}
+
+.rbc-date-cell {
+  @apply !p-4 !text-xs !font-black !text-zinc-400 dark:!text-zinc-600 transition-all;
+}
+
+.rbc-date-cell.rbc-now {
+  @apply !text-blue-600 dark:!text-blue-400 !scale-110;
+}
+
+.rbc-event {
+  @apply !bg-transparent !p-1 !border-none focus:!outline-none;
+}
+
+.rbc-event-content {
+  @apply !p-0;
+}
+
+.rbc-show-more {
+  @apply !text-[10px] !font-black !uppercase !text-blue-600 dark:!text-blue-400 !bg-transparent hover:!underline;
+}
+
+.rbc-toolbar {
+  @apply !mb-8 !flex !flex-wrap !gap-4 !items-center !justify-between;
+}
+
+.rbc-toolbar button {
+  @apply !bg-white dark:!bg-zinc-900 !border !border-zinc-200 dark:!border-zinc-800 !text-zinc-600 dark:!text-zinc-400 !px-4 !py-2 !rounded-xl !text-xs !font-bold !transition-all hover:!bg-zinc-50 dark:hover:!bg-zinc-800 active:!scale-95;
+}
+
+.rbc-toolbar button.rbc-active {
+  @apply !bg-zinc-900 dark:!bg-white !text-white dark:!text-zinc-900 !border-zinc-900 dark:!border-white !shadow-lg;
+}
+
+.rbc-toolbar-label {
+  @apply !text-xl !font-black !text-zinc-900 dark:!text-white !tracking-tight;
+}
+
+.rbc-btn-group {
+  @apply !flex !gap-1;
+}
+

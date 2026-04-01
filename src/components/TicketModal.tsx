@@ -4,7 +4,7 @@ import { X, Send, User as UserIcon, Clock, CheckCircle2, AlertCircle, MessageSqu
 import DatePicker, { registerLocale } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ptBR } from "date-fns/locale";
-import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority } from "../types";
+import { Ticket, TicketStatus, ClientName, TicketUpdate, TicketAttachment, TicketCategory, TicketPriority, AppSettings } from "../types";
 registerLocale("pt-BR", ptBR);
 import { CLIENTS, STATUSES, STATUS_COLORS, STATUS_TEXT_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { formatFirestoreDate, getTimeOpen, formatHoursToHMin } from "../utils/dateUtils";
@@ -22,9 +22,10 @@ interface TicketModalProps {
   clientResponsibles?: Record<string, string[]>;
   allClients?: string[];
   allCategories?: string[];
+  settings: AppSettings;
 }
 
-export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdate, onDelete, user, activeClient, clientResponsibles, allClients = [], allCategories = [] }: TicketModalProps) {
+export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdate, onDelete, user, activeClient, clientResponsibles, allClients = [], allCategories = [], settings }: TicketModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [client, setClient] = useState<ClientName>(activeClient || (allClients[0] || CLIENTS[0]));
@@ -43,6 +44,7 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
   const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeModalTab, setActiveModalTab] = useState<"details" | "comments" | "attachments" | "history">("details");
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +117,14 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
         setIsImportant(ticket.isImportant || false);
         setTotalHours(ticket.totalHours || 0);
         setAttachments(ticket.attachments || []);
+        
+        // Adjust textarea height on next tick
+        setTimeout(() => {
+          if (descriptionRef.current) {
+            descriptionRef.current.style.height = 'auto';
+            descriptionRef.current.style.height = descriptionRef.current.scrollHeight + 'px';
+          }
+        }, 0);
       } else {
         setTitle("");
         setDescription("");
@@ -291,7 +301,10 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                   <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">
                     #{ticket.id}
                   </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${STATUS_TEXT_COLORS[ticket.status]} bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700`}>
+                <span 
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${!settings.statusColors?.[ticket.status] ? STATUS_TEXT_COLORS[ticket.status] : ""} bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700`}
+                  style={settings.statusColors?.[ticket.status] ? { color: settings.statusColors[ticket.status] } : {}}
+                >
                   {ticket.status}
                 </span>
                 {ticket.category && (
@@ -353,10 +366,11 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
               />
               {errors.title && <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-2">{errors.title}</p>}
               <textarea 
+                ref={descriptionRef}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Adicione uma descrição para este chamado..."
-                className="w-full text-sm text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 min-h-[100px]"
+                className="w-full text-base text-zinc-500 dark:text-zinc-400 bg-transparent border-none focus:outline-none resize-none placeholder:text-zinc-300 dark:placeholder:text-zinc-700 min-h-[150px]"
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';

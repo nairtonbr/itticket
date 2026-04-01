@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon } from "lucide-react";
-import { AppSettings, ClientName, UserProfile, UserRole } from "../types";
-import { CLIENTS } from "../constants";
+import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette } from "lucide-react";
+import { AppSettings, ClientName, UserProfile, UserRole, TicketStatus } from "../types";
+import { CLIENTS, STATUSES } from "../constants";
 import { testWhatsAppConnection, checkInstanceStatus } from "../utils/whatsappUtils";
 import { Send, Activity } from "lucide-react";
 
@@ -19,7 +19,7 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp" | "status">("general");
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
   const [evolutionApiUrl, setEvolutionApiUrl] = useState(settings.evolutionApiUrl || "");
@@ -39,6 +39,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   const [clientResponsibles, setClientResponsibles] = useState<Record<string, string[]>>(settings.clientResponsibles || {});
   const [customClients, setCustomClients] = useState<string[]>(settings.customClients || []);
   const [customCategories, setCustomCategories] = useState<string[]>(settings.customCategories || []);
+  const [statusColors, setStatusColors] = useState<Record<string, string>>(settings.statusColors || {});
   const [newClientName, setNewClientName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   
@@ -76,6 +77,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     setClientResponsibles(settings.clientResponsibles || {});
     setCustomClients(settings.customClients || []);
     setCustomCategories(settings.customCategories || []);
+    setStatusColors(settings.statusColors || {});
   }, [settings]);
 
   const handleAddClientPhone = () => {
@@ -273,6 +275,17 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
     onUpdateSettings({ customCategories: newCustom });
   };
 
+  const handleUpdateStatusColor = (status: string, color: string) => {
+    const newColors = { ...statusColors, [status]: color };
+    setStatusColors(newColors);
+    onUpdateSettings({ statusColors: newColors });
+  };
+
+  const handleResetStatusColors = () => {
+    setStatusColors({});
+    onUpdateSettings({ statusColors: {} });
+  };
+
   const handleCreateUser = async () => {
     if (!newUser.email || !newUser.password) return;
     
@@ -390,6 +403,17 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
         >
           <Globe className="w-4 h-4" />
           WhatsApp
+        </button>
+        <button
+          onClick={() => setActiveTab("status")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+            activeTab === "status" 
+              ? "bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm" 
+              : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          <Palette className="w-4 h-4" />
+          Status
         </button>
       </div>
 
@@ -862,8 +886,12 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
               >
                 {customClients.includes(client) && (
                   <button 
-                    onClick={() => handleRemoveClient(client)}
-                    className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                    onClick={() => {
+                      if (window.confirm(`Tem certeza que deseja excluir o cliente "${client}"?`)) {
+                        handleRemoveClient(client);
+                      }
+                    }}
+                    className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-all"
                     title="Remover Cliente"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1131,6 +1159,49 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 ))}
               </tbody>
             </table>
+          </div>
+        </motion.div>
+      )}
+      {activeTab === "status" && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-8"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                <Palette className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Cores dos Status</h3>
+            </div>
+            <button 
+              onClick={handleResetStatusColors}
+              className="text-xs font-bold text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+            >
+              Resetar para Padrão
+            </button>
+          </div>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Personalize as cores que representam cada status no sistema.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {STATUSES.map((status) => (
+              <div key={status} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div 
+                    className="w-4 h-4 rounded-full shadow-sm" 
+                    style={{ backgroundColor: statusColors[status] || (status === "Aberto" ? "#3b82f6" : status === "Em Andamento" ? "#eab308" : status === "Aguardando Cliente" ? "#a855f7" : status === "Aguardando Terceiros" ? "#f97316" : "#22c55e") }}
+                  />
+                  <span className="text-sm font-bold text-zinc-900 dark:text-white">{status}</span>
+                </div>
+                <input 
+                  type="color" 
+                  value={statusColors[status] || (status === "Aberto" ? "#3b82f6" : status === "Em Andamento" ? "#eab308" : status === "Aguardando Cliente" ? "#a855f7" : status === "Aguardando Terceiros" ? "#f97316" : "#22c55e")}
+                  onChange={(e) => handleUpdateStatusColor(status, e.target.value)}
+                  className="w-10 h-10 rounded-lg cursor-pointer bg-transparent border-none"
+                />
+              </div>
+            ))}
           </div>
         </motion.div>
       )}

@@ -902,12 +902,12 @@ export default function App() {
       
       if (!matchesStatus || !matchesClient || !matchesResponsible || !matchesCategory || !matchesSearch) return false;
 
-      // Special filter for Resolvido: only current month in dashboard
+      // Special filter for Resolvido: only last 2 days in dashboard
       if (statusFilter === "Resolvido" && activeTab === "dashboard") {
         const date = getFirestoreDate(t.updatedAt || t.createdAt);
-        if (!date || !isWithinInterval(date, { start: startOfMonth(new Date()), end: endOfMonth(new Date()) })) {
-          return false;
-        }
+        if (!date) return false;
+        const twoDaysAgo = subDays(new Date(), 2);
+        if (date < twoDaysAgo) return false;
       }
 
       return true;
@@ -1268,12 +1268,15 @@ export default function App() {
                           }}
                           className="w-full flex items-center gap-3 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl transition-colors text-left group"
                         >
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${
-                            ticket.status === "Aberto" ? "bg-red-500" :
-                            ticket.status === "Em Andamento" ? "bg-yellow-500" :
-                            ticket.status === "Resolvido" ? "bg-green-500" :
-                            "bg-zinc-400"
-                          }`} />
+                          <div 
+                            className={`w-2 h-2 rounded-full shrink-0 ${!settings.statusColors?.[ticket.status] ? (
+                              ticket.status === "Aberto" ? "bg-red-500" :
+                              ticket.status === "Em Andamento" ? "bg-yellow-500" :
+                              ticket.status === "Resolvido" ? "bg-green-500" :
+                              "bg-zinc-400"
+                            ) : ""}`}
+                            style={settings.statusColors?.[ticket.status] ? { backgroundColor: settings.statusColors[ticket.status] } : {}}
+                          />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-xs font-bold text-zinc-900 dark:text-white truncate group-hover:text-blue-600 transition-colors">
@@ -1386,20 +1389,20 @@ export default function App() {
               <>
                 {/* Stats Grid */}
                 <div className="flex justify-center">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 md:gap-6 w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-6 w-full">
                   {[
                     { label: "Total", value: ticketsByTab.filter(t => !t.archived && t.status !== "Resolvido").length, color: "blue", icon: <BarChart3 />, gradient: "from-blue-500/10 to-transparent" },
-                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent" },
-                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent" },
-                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent" },
-                    { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros" && !t.archived).length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent" },
+                    { label: "Em Aberto", value: ticketsByTab.filter(t => t.status === "Aberto" && !t.archived).length, color: "red", icon: <AlertCircle />, gradient: "from-red-500/10 to-transparent", status: "Aberto" as TicketStatus },
+                    { label: "Em Andamento", value: ticketsByTab.filter(t => t.status === "Em Andamento" && !t.archived).length, color: "yellow", icon: <Clock />, gradient: "from-yellow-500/10 to-transparent", status: "Em Andamento" as TicketStatus },
+                    { label: "Aguardando Cliente", value: ticketsByTab.filter(t => t.status === "Aguardando Cliente" && !t.archived).length, color: "purple", icon: <UserIcon />, gradient: "from-purple-500/10 to-transparent", status: "Aguardando Cliente" as TicketStatus },
+                    { label: "Aguardando Terceiros", value: ticketsByTab.filter(t => t.status === "Aguardando Terceiros" && !t.archived).length, color: "orange", icon: <Clock />, gradient: "from-orange-500/10 to-transparent", status: "Aguardando Terceiros" as TicketStatus },
                     { label: "RESOLVIDOS ULTIMOS 2d", value: ticketsByTab.filter(t => {
                       if (t.status !== "Resolvido" || t.archived) return false;
                       const date = getFirestoreDate(t.updatedAt || t.createdAt);
                       if (!date) return false;
                       const twoDaysAgo = subDays(new Date(), 2);
                       return date >= twoDaysAgo;
-                    }).length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent" }
+                    }).length, color: "green", icon: <CheckCircle2 />, gradient: "from-green-500/10 to-transparent", status: "Resolvido" as TicketStatus }
                   ].map((stat, i) => (
                     <motion.button
                       key={stat.label}
@@ -1425,17 +1428,25 @@ export default function App() {
                           : "bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-900 shadow-sm hover:shadow-md"
                       }`}
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+                      <div 
+                        className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} 
+                        style={stat.status && settings.statusColors?.[stat.status] ? { backgroundImage: `linear-gradient(to bottom right, ${settings.statusColors[stat.status]}15, transparent)` } : {}}
+                      />
                       
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 relative z-10 ${
-                        stat.color === "blue" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
-                        stat.color === "green" ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
-                        stat.color === "red" ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
-                        stat.color === "yellow" ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400" :
-                        stat.color === "purple" ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" :
-                        stat.color === "orange" ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
-                        "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
-                      }`}>
+                      <div 
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 relative z-10 ${
+                          !stat.status || !settings.statusColors?.[stat.status] ? (
+                            stat.color === "blue" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400" :
+                            stat.color === "green" ? "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400" :
+                            stat.color === "red" ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400" :
+                            stat.color === "yellow" ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-400" :
+                            stat.color === "purple" ? "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400" :
+                            stat.color === "orange" ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
+                            "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400"
+                          ) : ""
+                        }`}
+                        style={stat.status && settings.statusColors?.[stat.status] ? { backgroundColor: `${settings.statusColors[stat.status]}20`, color: settings.statusColors[stat.status] } : {}}
+                      >
                         <div className="w-6 h-6">
                           {stat.icon}
                         </div>
@@ -1573,23 +1584,25 @@ export default function App() {
                 <div className="flex justify-center w-full">
                   <div className="min-h-[600px] flex flex-col gap-6 w-full">
                     {viewMode === "kanban" ? (
-                    <KanbanBoard 
-                      tickets={filteredTickets} 
-                      onTicketClick={(ticket) => {
-                        setSelectedTicket(ticket);
-                        setIsModalOpen(true);
-                      }}
-                      onStatusChange={handleUpdateTicket}
-                    />
-                  ) : (
-                    <>
-                      <TicketList 
-                        tickets={paginatedTickets} 
+                      <KanbanBoard 
+                        tickets={filteredTickets} 
                         onTicketClick={(ticket) => {
                           setSelectedTicket(ticket);
                           setIsModalOpen(true);
                         }}
+                        onStatusChange={handleUpdateTicket}
+                        settings={settings}
                       />
+                    ) : (
+                      <>
+                        <TicketList 
+                          tickets={paginatedTickets} 
+                          onTicketClick={(ticket) => {
+                            setSelectedTicket(ticket);
+                            setIsModalOpen(true);
+                          }}
+                          settings={settings}
+                        />
                       
                       {/* Pagination Controls */}
                       {totalPages > 1 && (
@@ -1649,6 +1662,7 @@ export default function App() {
             clientResponsibles={settings.clientResponsibles}
             allClients={visibleClients}
             allCategories={allCategories}
+            settings={settings}
           />
         )}
       </AnimatePresence>
