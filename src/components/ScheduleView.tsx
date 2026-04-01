@@ -1,18 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
-  Calendar as CalendarIcon, 
   Plus, 
-  User, 
   Clock,
   Trash2,
-  Sun,
-  CloudSun,
-  Moon,
   ShieldAlert,
-  Hash,
-  Briefcase,
-  Tag as TagIcon
+  Hash
 } from "lucide-react";
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -53,7 +46,7 @@ type CalendarEvent = {
 export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, onAdd, onDelete, users, tickets, onTicketClick }) => {
   const [isAdding, setIsAdding] = useState(false);
   const [newEntry, setNewEntry] = useState<Partial<ScheduleEntry>>({
-    shift: "Manhã",
+    shift: "Plantão",
     analyst: ""
   });
 
@@ -68,14 +61,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
       start.setHours(0, 0, 1, 0);
       
       const end = s.endDate ? new Date(s.endDate) : new Date(s.date);
-      if (s.endDate) {
-        end.setHours(23, 59, 59, 999);
-      } else {
-        end.setHours(23, 59, 59, 999);
-      }
+      end.setHours(23, 59, 59, 999);
+
       return {
         id: s.id,
-        title: `${s.analyst} (${s.shift})`,
+        title: `${s.analyst} (Plantão)`,
         start,
         end,
         allDay: true,
@@ -128,7 +118,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
 
     await onAdd(payload);
     setIsAdding(false);
-    setNewEntry({ shift: "Manhã", analyst: "" });
+    setNewEntry({ shift: "Plantão", analyst: "" });
   };
 
   const handleDeleteScheduleClick = async (id: string) => {
@@ -138,48 +128,45 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">Agenda (Chamados e Escala de Analistas)</h2>
-          <p className="text-zinc-500 dark:text-zinc-400 font-medium">Cronograma de plantões e turnos da equipe IT</p>
+          <h2 className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">Agenda</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium mb-4">Chamados e Escala de Analistas</p>
+          
+          <div className="flex flex-wrap gap-4 px-3 py-1.5 bg-zinc-50/50 dark:bg-zinc-800/20 rounded-xl border border-zinc-100 dark:border-zinc-800/50 w-fit">
+            {[
+              { label: "Plantão", color: "bg-rose-500", icon: <ShieldAlert className="w-3 h-3" /> },
+              { label: "Chamado", color: "bg-zinc-400", icon: <Hash className="w-3 h-3" /> }
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2">
+                <div className={`p-1 rounded-md ${item.color} bg-opacity-10 text-opacity-100 ${item.color.replace('bg-', 'text-')}`}>
+                  {item.icon}
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{item.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {isAdmin && (
           <button 
             onClick={() => setIsAdding(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-2xl transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2 h-fit"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
             Nova Agenda
           </button>
         )}
       </div>
 
-      <div className="flex flex-wrap gap-6 px-4 py-2 bg-zinc-50/50 dark:bg-zinc-800/20 rounded-2xl border border-zinc-100 dark:border-zinc-800/50 w-fit">
-        {[
-          { label: "Manhã", color: "bg-blue-500", icon: <Sun className="w-3 h-3" /> },
-          { label: "Tarde", color: "bg-orange-500", icon: <CloudSun className="w-3 h-3" /> },
-          { label: "Noite", color: "bg-indigo-500", icon: <Moon className="w-3 h-3" /> },
-          { label: "Plantão", color: "bg-rose-500", icon: <ShieldAlert className="w-3 h-3" /> },
-          { label: "Chamado", color: "bg-zinc-400", icon: <Hash className="w-3 h-3" /> }
-        ].map(item => (
-          <div key={item.label} className="flex items-center gap-2.5">
-            <div className={`p-1.5 rounded-lg ${item.color} bg-opacity-10 text-opacity-100 ${item.color.replace('bg-', 'text-')}`}>
-              {item.icon}
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{item.label}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white dark:bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-zinc-900 rounded-[2rem] p-6 border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden">
         <Calendar<CalendarEvent>
           localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
           allDayAccessor="allDay"
-          style={{ height: 850 }}
+          style={{ height: 800 }}
           eventPropGetter={(event) => ({
             style: {
               backgroundColor: 'transparent',
@@ -209,38 +196,38 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
             toolbar: (props) => {
               const { label, onNavigate, onView, view } = props;
               return (
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-3 mb-6">
+                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
                     <button 
                       onClick={() => onNavigate('PREV')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
                     >
                       Anterior
                     </button>
                     <button 
                       onClick={() => onNavigate('TODAY')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm transition-all active:scale-95"
                     >
                       Hoje
                     </button>
                     <button 
                       onClick={() => onNavigate('NEXT')}
-                      className="px-4 py-2 rounded-xl text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
+                      className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-zinc-900 transition-all active:scale-95"
                     >
                       Próximo
                     </button>
                   </div>
 
-                  <h3 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight uppercase">
+                  <h3 className="text-base font-black text-zinc-900 dark:text-white tracking-tight uppercase">
                     {label}
                   </h3>
 
-                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                  <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-xl border border-zinc-200 dark:border-zinc-700">
                     {['month', 'week', 'day', 'agenda'].map((v) => (
                       <button 
                         key={v}
                         onClick={() => onView(v as any)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
+                        className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                           view === v 
                             ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm" 
                             : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
@@ -296,39 +283,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                 );
               }
 
-              const shiftIcons = {
-                "Manhã": <Sun className="w-3 h-3" />,
-                "Tarde": <CloudSun className="w-3 h-3" />,
-                "Noite": <Moon className="w-3 h-3" />,
-                "Plantão": <ShieldAlert className="w-3 h-3" />
-              };
-
-              const shiftColors = {
-                "Manhã": "bg-blue-500/5 text-blue-600/70 border-blue-200/30 dark:bg-blue-500/10 dark:text-blue-400/70 dark:border-blue-800/30",
-                "Tarde": "bg-orange-500/5 text-orange-600/70 border-orange-200/30 dark:bg-orange-500/10 dark:text-orange-400/70 dark:border-orange-800/30",
-                "Noite": "bg-indigo-500/5 text-indigo-600/70 border-indigo-200/30 dark:bg-indigo-500/10 dark:text-indigo-400/70 dark:border-indigo-800/30",
-                "Plantão": "bg-rose-500/5 text-rose-600/70 border-rose-200/30 dark:bg-rose-500/10 dark:text-rose-400/70 dark:border-rose-800/30"
-              };
-
-              const dotColors = {
-                "Manhã": "bg-blue-500/50",
-                "Tarde": "bg-orange-500/50",
-                "Noite": "bg-indigo-500/50",
-                "Plantão": "bg-rose-500/50"
-              };
+              const shiftIcon = <ShieldAlert className="w-3 h-3" />;
+              const shiftColor = "bg-rose-500/5 text-rose-600/70 border-rose-200/30 dark:bg-rose-500/10 dark:text-rose-400/70 dark:border-rose-800/30";
+              const dotColor = "bg-rose-500/50";
 
               return (
-                <div className={`group relative px-1.5 py-0.5 rounded-sm text-[9px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColors[res.shift as keyof typeof shiftColors]}`}>
+                <div className={`group relative px-1.5 py-0.5 rounded-sm text-[9px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColor}`}>
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1 truncate">
-                      <div className={`w-1 h-1 rounded-full shrink-0 shadow-sm ${dotColors[res.shift as keyof typeof dotColors]}`} />
+                      <div className={`w-1 h-1 rounded-full shrink-0 shadow-sm ${dotColor}`} />
                       <span className="truncate tracking-tight opacity-90">{res.analyst}</span>
-                      {res.shift === "Plantão" && (
-                        <span className="px-0.5 rounded-xs bg-white/20 text-[7px] font-black uppercase tracking-tighter shrink-0">Plantão</span>
-                      )}
+                      <span className="px-0.5 rounded-xs bg-white/20 text-[7px] font-black uppercase tracking-tighter shrink-0">Plantão</span>
                     </div>
                     <div className="opacity-10 group-hover:opacity-100 transition-opacity shrink-0">
-                      {shiftIcons[res.shift as keyof typeof shiftIcons]}
+                      {shiftIcon}
                     </div>
                   </div>
                   
@@ -379,7 +347,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">
-                  {newEntry.shift === "Plantão" ? "Data Início" : "Data"}
+                  Data Início
                 </label>
                 <input 
                   type="date"
@@ -389,35 +357,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                 />
               </div>
 
-              {newEntry.shift === "Plantão" && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Data Fim</label>
-                  <input 
-                    type="date"
-                    value={newEntry.endDate || ""}
-                    onChange={e => setNewEntry(prev => ({ ...prev, endDate: e.target.value }))}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold dark:text-white"
-                  />
-                </div>
-              )}
-
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Turno</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {["Manhã", "Tarde", "Noite", "Plantão"].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setNewEntry(prev => ({ ...prev, shift: s as any }))}
-                      className={`py-3 rounded-2xl text-xs font-bold border transition-all ${
-                        newEntry.shift === s 
-                          ? "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20" 
-                          : "bg-zinc-50 dark:bg-zinc-800 border-zinc-100 dark:border-zinc-700 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                <label className="text-[10px] font-black text-zinc-400 uppercase tracking-widest px-1">Data Fim</label>
+                <input 
+                  type="date"
+                  value={newEntry.endDate || ""}
+                  onChange={e => setNewEntry(prev => ({ ...prev, endDate: e.target.value }))}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 rounded-2xl px-4 py-3 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all font-bold dark:text-white"
+                />
               </div>
             </div>
 
