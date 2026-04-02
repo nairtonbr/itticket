@@ -1,6 +1,6 @@
 import { ClientName, TicketStatus, TicketCategory, TicketPriority } from "./types";
 
-export const CLIENTS: ClientName[] = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo"];
+export const CLIENTS: ClientName[] = [];
 export const STATUSES: TicketStatus[] = ["Aberto", "Em Andamento", "Aguardando Cliente", "Aguardando Terceiros", "Resolvido"];
 export const CATEGORIES: TicketCategory[] = ["Engenharia IP", "Infraestrutura", "NOC", "Projetos", "Suporte"];
 export const PRIORITIES: TicketPriority[] = ["Baixa", "Média", "Alta", "Urgente"];

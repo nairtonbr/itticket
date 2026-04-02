@@ -5,37 +5,26 @@ service cloud.firestore {
     // Assumed Data Model
     // ===============================================================
     //
-    // Collection: tickets
-    // Document ID: auto-generated or custom string
+    // Collection: companies
+    // Document ID: companyId
     // Fields:
-    //   - id: string (required)
-    //   - title: string (required, 1-200 chars)
-    //   - description: string (optional, 0-2000 chars)
-    //   - client: string (required, enum)
-    //   - status: string (required, enum)
-    //   - category: string (optional, enum)
-    //   - responsible: string (optional)
-    //   - sla: string (optional)
-    //   - createdAt: timestamp (required)
-    //   - updatedAt: timestamp (optional)
-    //   - updates: list of maps (optional)
-    //   - attachments: list of maps (optional)
+    //   - id: string
+    //   - name: string
+    //   - active: boolean
+    //   - settings: map
     //
-    // Collection: settings
-    // Document ID: global
+    // Collection: tickets
+    // Document ID: auto-generated
     // Fields:
-    //   - webhookUrl: string (optional, URL)
-    //   - clientLogos: map (optional)
-    //   - clientResponsibles: map (optional)
+    //   - companyId: string (required)
+    //   ...
     //
     // Collection: users
     // Document ID: userId (auth.uid)
     // Fields:
-    //   - uid: string (required, matches doc ID)
-    //   - email: string (required, PII)
-    //   - displayName: string (optional)
-    //   - role: string (required, admin|user|client)
-    //   - associatedClient: string (optional, for role=='client')
+    //   - companyId: string (required)
+    //   - role: string (superadmin|admin|user|client|pending)
+    //   ...
     //
     // ===============================================================
 
@@ -55,15 +44,18 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        (getUserData().role == 'superadmin' || 
+         request.auth.token.email == "nairtonbraga00@gmail.com");
+    }
+
     function hasRole(role) {
       return userExists() && getUserData().role == role;
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
-        (hasRole('admin') ||
-         request.auth.token.email == "nairtonbraga00@gmail.com" ||
-         request.auth.token.email == "noc.itmanage@gmail.com"); 
+      return isSuperAdmin() || hasRole('admin');
     }
 
     function isUser() {
@@ -74,102 +66,58 @@ service cloud.firestore {
       return hasRole('client');
     }
 
-    function getAssociatedClient() {
-      return getUserData().associatedClient;
+    function getCompanyId() {
+      return getUserData().companyId;
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    function belongsToCompany(companyId) {
+      return isSuperAdmin() || (isAuthenticated() && getCompanyId() == companyId);
     }
 
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    function resourceBelongsToUserCompany() {
+      return belongsToCompany(resource.data.companyId);
     }
 
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidTicket(data) {
-      // Basic type checks if fields are present
-      // Allow admins to bypass strict schema for legacy/batch updates
-      return isAdmin() || (
-             (!('title' in data) || (data.title is string && data.title.size() > 0 && data.title.size() <= 200)) &&
-             (!('client' in data) || (data.client is string && data.client.size() > 0 && data.client.size() <= 100)) &&
-             (!('status' in data) || data.status in ['Aberto', 'Em Andamento', 'Aguardando Cliente', 'Aguardando Terceiros', 'Resolvido']) &&
-             (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
-             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
-             (!('updates' in data) || data.updates is list) &&
-             (!('attachments' in data) || data.attachments is list) &&
-             (!('archived' in data) || data.archived is int)
-      );
-    }
-
-    function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'email', 'role']) &&
-             data.uid == request.auth.uid &&
-             isValidEmail(data.email) &&
-             data.role in ['admin', 'user', 'client', 'pending'] &&
-             (!('associatedClient' in data) || data.associatedClient is string);
+    function requestBelongsToUserCompany() {
+      return belongsToCompany(request.resource.data.companyId);
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
-    function areSlaAlertsEnabled() {
-      let settings = get(/databases/$(database)/documents/settings/global);
-      return settings != null && settings.data.slaAlertsEnabled == true;
+    match /companies/{companyId} {
+      // Superadmins can do anything
+      // Admins/Users/Clients can read their own company
+      allow read: if belongsToCompany(companyId);
+      allow write: if isSuperAdmin();
     }
 
     match /users/{userId} {
-      // Users can only read their own profile (PII protection)
-      // Admins can read all profiles
-      allow read: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+      allow read: if (isAuthenticated() && request.auth.uid == userId) || isSuperAdmin() || (isAdmin() && getUserData().companyId == get(/databases/$(database)/documents/users/$(userId)).data.companyId);
       
-      // Creation: Users can create their own profile as 'client' by default
-      // Admins can create any profile
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ( (request.auth.uid == userId && request.resource.data.role == 'client') || isAdmin() );
+      allow create: if isAuthenticated() && 
+                    (isSuperAdmin() || (request.auth.uid == userId && request.resource.data.role == 'pending'));
       
-      // Update: Users can update their own profile but NOT their role
-      // Admins can update anything
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) &&
-                    ( (request.auth.uid == userId && request.resource.data.role == resource.data.role) || isAdmin() );
+      allow update: if isAuthenticated() && 
+                    (isSuperAdmin() || (isAdmin() && getCompanyId() == resource.data.companyId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role));
     }
 
     match /tickets/{ticketId} {
-      // Read: Admins and internal users see all. Clients see only their associated client tickets.
-      allow read: if isAdmin() || isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos"));
+      allow read: if isSuperAdmin() || (resourceBelongsToUserCompany() && (isAdmin() || isUser() || (isClient() && resource.data.client == getUserData().associatedClient)));
       
-      // Create: Admins and users can create for any client. Clients can only create for themselves.
-      allow create: if isAuthenticated() && 
-                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (request.resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos")))));
+      allow create: if isAuthenticated() && requestBelongsToUserCompany() && 
+                    (isAdmin() || isUser() || (isClient() && request.resource.data.client == getUserData().associatedClient));
       
-      // Update: Admins can update anything. Users/Clients must follow schema and ownership.
-      // CRITICAL: Block lastSlaNotification updates if SLA alerts are disabled in settings
-      allow update: if isAuthenticated() && 
-                    (isAdmin() || (isValidTicket(request.resource.data) && (isUser() || (isClient() && (resource.data.client == getAssociatedClient() || getAssociatedClient() == "Todos"))))) &&
-                    (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastSlaNotification']) || areSlaAlertsEnabled());
+      allow update: if isAuthenticated() && resourceBelongsToUserCompany() && requestBelongsToUserCompany() &&
+                    (isAdmin() || isUser() || (isClient() && resource.data.client == getUserData().associatedClient));
       
-      // Delete: Only admins
-      allow delete: if isAdmin();
-    }
-
-    match /settings/global {
-      // Read: Any authenticated user
-      allow read: if isAuthenticated();
-      
-      // Write: Only admins
-      allow write: if isAdmin();
+      allow delete: if isSuperAdmin() || (isAdmin() && resourceBelongsToUserCompany());
     }
 
     match /schedules/{scheduleId} {
-      // Read: Any authenticated user
-      allow read: if isAuthenticated();
-      
-      // Write: Only admins
-      allow write: if isAdmin();
+      allow read: if isSuperAdmin() || resourceBelongsToUserCompany();
+      allow write: if isSuperAdmin() || (isAdmin() && requestBelongsToUserCompany());
     }
   }
 }

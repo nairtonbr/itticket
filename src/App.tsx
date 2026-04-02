@@ -33,7 +33,7 @@ import TicketModal from "./components/TicketModal";
 import SettingsView from "./components/SettingsView";
 import { ReportsView } from "./components/ReportsView";
 import { ScheduleView } from "./components/ScheduleView";
-import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile } from "./types";
+import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile, Company } from "./types";
 import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
 import { sendWhatsAppNotification } from "./utils/whatsappUtils";
@@ -76,6 +76,7 @@ export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -90,6 +91,8 @@ export default function App() {
   });
   const [schedules, setSchedules] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -135,12 +138,14 @@ export default function App() {
 
   const allClients = React.useMemo(() => {
     const custom = settings.customClients || [];
-    return Array.from(new Set([...CLIENTS, ...custom])).sort();
+    if (custom.length > 0) return custom.sort();
+    return [...CLIENTS].sort();
   }, [settings.customClients]);
 
   const allCategories = React.useMemo(() => {
     const custom = settings.customCategories || [];
-    return Array.from(new Set([...CATEGORIES, ...custom])).sort();
+    if (custom.length > 0) return custom.sort();
+    return [...CATEGORIES].sort();
   }, [settings.customCategories]);
 
   const checkSlaAndNotify = async () => {
@@ -164,7 +169,8 @@ export default function App() {
 
     // Only run if it's 09:00 Brasília time or later, and hasn't run today
     // We also check if the user is an admin because only admins can update the global settings
-    if (userProfile?.role !== 'admin') return;
+    if (!userProfile?.companyId) return;
+    if (userProfile?.role !== 'admin' && userProfile?.role !== 'superadmin') return;
     if (brasiliaHour < 9) return;
     if (currentSettings.lastSlaCheckDate === brasiliaDate) return;
 
@@ -172,8 +178,8 @@ export default function App() {
 
     // Update lastSlaCheckDate immediately to avoid race conditions from multiple clients
     try {
-      await updateDoc(doc(db, "settings", "global"), {
-        lastSlaCheckDate: brasiliaDate
+      await updateDoc(doc(db, "companies", userProfile.companyId), {
+        "settings.lastSlaCheckDate": brasiliaDate
       });
     } catch (error) {
       console.error("Erro ao atualizar data da última verificação de SLA:", error);
@@ -242,12 +248,13 @@ export default function App() {
   }, []);
 
   const handleArchiveOldTickets = async () => {
-    if (!auth.currentUser || userProfile?.role !== "admin") return;
+    if (!auth.currentUser || !userProfile?.companyId || (userProfile?.role !== "admin" && userProfile?.role !== "superadmin")) return;
     
     try {
       const thirtyDaysAgo = subDays(new Date(), 30);
       const q = query(
         collection(db, "tickets"),
+        where("companyId", "==", userProfile.companyId),
         where("status", "==", "Resolvido")
       );
       
@@ -277,7 +284,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (userProfile?.role === "admin") {
+    if (userProfile?.role === "admin" || userProfile?.role === "superadmin") {
       handleArchiveOldTickets();
     }
   }, [userProfile]);
@@ -324,6 +331,7 @@ export default function App() {
         e.preventDefault();
         if (
           userProfile?.role === "admin" ||
+          userProfile?.role === "superadmin" ||
           userProfile?.role === "user" ||
           (userProfile?.role === "client" && userProfile?.associatedClient)
         ) {
@@ -347,32 +355,44 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const adminEmails = ["nairtonbraga00@gmail.com", "noc.itmanage@gmail.com"];
-          const isHardcodedAdmin = firebaseUser.email && adminEmails.includes(firebaseUser.email.toLowerCase());
-          
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
           
           if (userDoc.exists()) {
             let profile = userDoc.data() as UserProfile;
             
-            // Force admin role if email is in the hardcoded list
-            if (isHardcodedAdmin && profile.role !== 'admin') {
-              profile.role = 'admin';
-              await setDoc(doc(db, "users", firebaseUser.uid), { role: 'admin' }, { merge: true });
+            // Bootstrap superadmin by email
+            if (firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com") {
+              profile.role = "superadmin";
             }
-            
+
             setUser(firebaseUser);
             setUserProfile(profile);
+
+            // Fetch company data
+            if (profile.companyId) {
+              const companyDoc = await getDoc(doc(db, "companies", profile.companyId));
+              if (companyDoc.exists()) {
+                setCompany(companyDoc.data() as Company);
+              }
+            }
           } else {
+            // New user - default to ITMANAGE for now or pending
+            const defaultCompanyId = "itmanage";
             const profile: UserProfile = {
               uid: firebaseUser.uid,
+              companyId: defaultCompanyId,
               email: firebaseUser.email || "",
               displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
-              role: isHardcodedAdmin ? "admin" : "pending"
+              role: firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com" ? "superadmin" : "pending"
             };
             await setDoc(doc(db, "users", firebaseUser.uid), profile);
             setUser(firebaseUser);
             setUserProfile(profile);
+
+            const companyDoc = await getDoc(doc(db, "companies", defaultCompanyId));
+            if (companyDoc.exists()) {
+              setCompany(companyDoc.data() as Company);
+            }
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -380,6 +400,7 @@ export default function App() {
       } else {
         setUser(null);
         setUserProfile(null);
+        setCompany(null);
       }
       setLoading(false);
     });
@@ -392,24 +413,33 @@ export default function App() {
     if (userProfile?.role === "client" && userProfile.associatedClient && userProfile.associatedClient !== "Todos") {
       setActiveTab(userProfile.associatedClient as ClientName);
     }
-  }, [userProfile]);
+    if (userProfile?.companyId) {
+      if (userProfile.role !== 'superadmin') {
+        setSelectedCompanyId(userProfile.companyId);
+      } else if (!selectedCompanyId) {
+        setSelectedCompanyId(userProfile.companyId);
+      }
+    }
+  }, [userProfile, selectedCompanyId]);
 
   // Real-time Data Fetching (Firestore)
   useEffect(() => {
-    if (!user || !userProfile) return;
+    if (!user || !userProfile || !userProfile.companyId) return;
+
+    const companyId = selectedCompanyId || userProfile.companyId;
 
     // Tickets Subscription
     let ticketsQuery;
-    if (userProfile.role === 'admin' || userProfile.role === 'user' || userProfile.associatedClient === 'Todos') {
+    if (userProfile.role === 'admin' || userProfile.role === 'user' || userProfile.associatedClient === 'Todos' || userProfile.role === 'superadmin') {
       ticketsQuery = query(
         collection(db, "tickets"),
+        where("companyId", "==", companyId),
         orderBy("createdAt", "desc")
       );
     } else {
-      // For specific clients, we remove orderBy to avoid missing index errors
-      // Sorting is handled client-side in filteredTickets
       ticketsQuery = query(
         collection(db, "tickets"),
+        where("companyId", "==", companyId),
         where("client", "==", userProfile.associatedClient || "")
       );
     }
@@ -422,10 +452,12 @@ export default function App() {
       setTickets(ticketsData);
     }, (error) => handleFirestoreError(error, OperationType.LIST, "tickets"));
 
-    // Settings Subscription
-    const unsubSettings = onSnapshot(doc(db, "settings", "global"), (doc) => {
+    // Settings Subscription (Now from Company document)
+    const unsubSettings = onSnapshot(doc(db, "companies", companyId), (doc) => {
       if (doc.exists()) {
-        const data = doc.data();
+        const companyData = doc.data() as Company;
+        const data = (companyData.settings || {}) as Partial<AppSettings>;
+        setCompany(companyData);
         setSettings(prev => ({ 
           ...prev, 
           ...data,
@@ -438,27 +470,53 @@ export default function App() {
           disabledSlaClients: data.disabledSlaClients || []
         }));
       }
-    }, (error) => handleFirestoreError(error, OperationType.GET, "settings/global"));
+    }, (error) => handleFirestoreError(error, OperationType.GET, `companies/${companyId}`));
 
     // Schedules Subscription
-    const unsubSchedules = onSnapshot(query(collection(db, "schedules"), orderBy("date", "asc")), (snapshot) => {
-      const schedulesData = snapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id
-      }));
-      setSchedules(schedulesData);
-    }, (error) => handleFirestoreError(error, OperationType.LIST, "schedules"));
-
-    // Users Subscription (Admin only)
-    let unsubUsers = () => {};
-    if (userProfile.role === 'admin') {
-      unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
-        const usersData = snapshot.docs.map(doc => ({
+    const unsubSchedules = onSnapshot(
+      query(
+        collection(db, "schedules"), 
+        where("companyId", "==", companyId),
+        orderBy("date", "asc")
+      ), 
+      (snapshot) => {
+        const schedulesData = snapshot.docs.map(doc => ({
           ...doc.data(),
           id: doc.id
         }));
-        setUsers(usersData);
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+        setSchedules(schedulesData);
+      }, (error) => handleFirestoreError(error, OperationType.LIST, "schedules"));
+
+    // Users Subscription (Admin only)
+    let unsubUsers = () => {};
+    if (userProfile.role === 'admin' || userProfile.role === 'superadmin') {
+      const usersQuery = userProfile.role === 'superadmin' 
+        ? collection(db, "users")
+        : query(collection(db, "users"), where("companyId", "==", companyId));
+
+      unsubUsers = onSnapshot(
+        usersQuery, 
+        (snapshot) => {
+          const usersData = snapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+          }));
+          setUsers(usersData);
+        }, (error) => handleFirestoreError(error, OperationType.LIST, "users"));
+    }
+
+    // Companies Subscription (Super Admin only)
+    let unsubCompanies = () => {};
+    if (userProfile.role === 'superadmin') {
+      unsubCompanies = onSnapshot(
+        collection(db, "companies"),
+        (snapshot) => {
+          const companiesData = snapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+          })) as Company[];
+          setCompanies(companiesData);
+        }, (error) => handleFirestoreError(error, OperationType.LIST, "companies"));
     }
 
     return () => {
@@ -466,8 +524,9 @@ export default function App() {
       unsubSettings();
       unsubSchedules();
       unsubUsers();
+      unsubCompanies();
     };
-  }, [user, userProfile, showArchived]);
+  }, [user, userProfile, showArchived, selectedCompanyId]);
 
   const greeting = React.useMemo(() => {
     const hour = new Date().getHours();
@@ -590,15 +649,19 @@ export default function App() {
   };
 
   const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
+    if (!userProfile?.companyId) return;
     try {
-      await updateDoc(doc(db, "settings", "global"), updates);
+      await updateDoc(doc(db, "companies", userProfile.companyId), {
+        settings: { ...settings, ...updates }
+      });
       toast.success("Configurações salvas!");
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, "settings/global");
+      handleFirestoreError(error, OperationType.WRITE, `companies/${userProfile.companyId}`);
     }
   };
 
   const handleCreateUser = async (userData: any) => {
+    if (!userProfile?.companyId) return;
     const { email, password, ...profile } = userData;
     try {
       // Use a secondary app to create the user without logging out the admin
@@ -611,6 +674,7 @@ export default function App() {
       const profileData = {
         ...profile,
         uid,
+        companyId: profile.companyId || userProfile.companyId,
         email,
         createdAt: new Date().toISOString()
       };
@@ -651,28 +715,36 @@ export default function App() {
   };
 
   const handleCreateTicket = async (ticketData: Partial<Ticket>) => {
+    if (!userProfile?.companyId) return;
     try {
       const now = new Date().toISOString();
+      const companyId = userProfile.companyId;
       
       const ticketId = await runTransaction(db, async (transaction) => {
-        const settingsRef = doc(db, "settings", "global");
-        const settingsSnap = await transaction.get(settingsRef);
+        const companyRef = doc(db, "companies", companyId);
+        const companySnap = await transaction.get(companyRef);
         
         let nextId = 2000;
-        if (settingsSnap.exists()) {
-          const data = settingsSnap.data() as AppSettings;
-          if (data.nextTicketId && typeof data.nextTicketId === 'number') {
-            nextId = data.nextTicketId;
+        if (companySnap.exists()) {
+          const data = companySnap.data() as Company;
+          if (data.settings?.nextTicketId && typeof data.settings.nextTicketId === 'number') {
+            nextId = data.settings.nextTicketId;
           }
         }
         
-        transaction.set(settingsRef, { nextTicketId: nextId + 1 }, { merge: true });
+        transaction.set(companyRef, { 
+          settings: { 
+            ...companySnap.data()?.settings,
+            nextTicketId: nextId + 1 
+          } 
+        }, { merge: true });
         return nextId.toString();
       });
       
       const formattedData: any = {
         ...ticketData,
         id: ticketId,
+        companyId,
         status: "Aberto",
         title: ticketData.title?.toUpperCase(),
         client:
@@ -857,9 +929,107 @@ export default function App() {
     }
   };
 
-  const handleCreateSchedule = async (scheduleData: any) => {
+  const handleCreateCompany = async (companyData: Partial<Company>) => {
+    if (userProfile?.role !== 'superadmin') return;
     try {
-      await addDoc(collection(db, "schedules"), scheduleData);
+      const id = companyData.id?.toLowerCase().replace(/\s+/g, '-') || "";
+      await setDoc(doc(db, "companies", id), {
+        ...companyData,
+        id,
+        createdAt: new Date().toISOString(),
+        active: true,
+        settings: {
+          webhookUrl: "",
+          nextTicketId: 2000
+        }
+      });
+      toast.success("Empresa criada com sucesso!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, "companies");
+    }
+  };
+
+  const handleUpdateCompany = async (id: string, data: Partial<Company>) => {
+    if (userProfile?.role !== 'superadmin') return;
+    try {
+      await setDoc(doc(db, "companies", id), data, { merge: true });
+      toast.success("Empresa atualizada com sucesso!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `companies/${id}`);
+    }
+  };
+
+  const handleMigrateData = async () => {
+    if (userProfile?.role !== 'superadmin') {
+      toast.error("Apenas Super Admins podem migrar dados");
+      return;
+    }
+
+    const toastId = toast.loading("Iniciando migração de dados...");
+    setLoading(true);
+    try {
+      const defaultCompanyId = "itmanage";
+      
+      // 1. Create default company if not exists
+      const companyDoc = await getDoc(doc(db, "companies", defaultCompanyId));
+      if (!companyDoc.exists()) {
+        const globalSettingsSnap = await getDoc(doc(db, "settings", "global"));
+        const globalSettings = globalSettingsSnap.exists() ? globalSettingsSnap.data() : {};
+        
+        await setDoc(doc(db, "companies", defaultCompanyId), {
+          id: defaultCompanyId,
+          name: "ITMANAGE",
+          active: true,
+          createdAt: new Date().toISOString(),
+          settings: globalSettings
+        });
+      }
+
+      // 2. Migrate Tickets
+      const ticketsSnap = await getDocs(collection(db, "tickets"));
+      const ticketPromises = ticketsSnap.docs
+        .filter(d => !d.data().companyId)
+        .map(d => updateDoc(doc(db, "tickets", d.id), { companyId: defaultCompanyId }));
+      
+      // 3. Migrate Users
+      const usersSnap = await getDocs(collection(db, "users"));
+      const userPromises = usersSnap.docs
+        .filter(d => !d.data().companyId)
+        .map(d => updateDoc(doc(db, "users", d.id), { companyId: defaultCompanyId }));
+
+      // 4. Migrate Schedules
+      const schedulesSnap = await getDocs(collection(db, "schedules"));
+      const schedulePromises = schedulesSnap.docs
+        .filter(d => !d.data().companyId)
+        .map(d => updateDoc(doc(db, "schedules", d.id), { companyId: defaultCompanyId }));
+
+      // 5. Set default clients for itmanage
+      const itmanageClients = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo"];
+      const itmanageDoc = await getDoc(doc(db, "companies", "itmanage"));
+      if (itmanageDoc.exists()) {
+        await updateDoc(doc(db, "companies", "itmanage"), {
+          "settings.customClients": itmanageClients
+        });
+      }
+
+      await Promise.all([...ticketPromises, ...userPromises, ...schedulePromises]);
+      
+      toast.success("Migração concluída com sucesso!", { id: toastId });
+    } catch (error) {
+      console.error("Migration error:", error);
+      toast.error("Erro durante a migração", { id: toastId });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateSchedule = async (scheduleData: any) => {
+    if (!userProfile?.companyId) return;
+    try {
+      await addDoc(collection(db, "schedules"), {
+        ...scheduleData,
+        companyId: userProfile.companyId
+      });
       toast.success("Agenda salva!");
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, "schedules");
@@ -1215,7 +1385,7 @@ export default function App() {
               </div>
             </div>
 
-            {(userProfile?.role === "admin" || userProfile?.role === "user") && (
+            {(userProfile?.role === "admin" || userProfile?.role === "user" || userProfile?.role === "superadmin") && (
               <div className="pt-6">
                 <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4 px-3">Análise</p>
                 <div className="space-y-1">
@@ -1266,6 +1436,24 @@ export default function App() {
             <div className="hidden md:block">
               <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                 {greeting}, {userProfile?.displayName?.split(' ')[0]}!
+                {company?.name && (
+                  <div className="flex items-center gap-2">
+                    <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest shadow-lg shadow-blue-500/20">
+                      {company.name}
+                    </span>
+                    {userProfile?.role === 'superadmin' && companies.length > 1 && (
+                      <select
+                        value={selectedCompanyId || ""}
+                        onChange={(e) => setSelectedCompanyId(e.target.value)}
+                        className="ml-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      >
+                        {companies.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
                 {isOnDuty && (
                   <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
                     Plantonista
@@ -1381,7 +1569,7 @@ export default function App() {
                 )}
               </button>
               
-              {userProfile?.role === "admin" && (
+              {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
                 <button 
                   onClick={() => setActiveTab("settings")}
                   className={`p-2.5 rounded-2xl transition-all ${activeTab === "settings" ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400" : "text-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800"}`}
@@ -1419,13 +1607,19 @@ export default function App() {
           <div className="max-w-full mx-auto space-y-10">
             {activeTab === "settings" ? (
               <SettingsView 
-                isAdmin={userProfile?.role === "admin"} 
+                isAdmin={userProfile?.role === "admin" || userProfile?.role === "superadmin"} 
+                userProfile={userProfile}
+                company={company}
                 settings={settings}
                 onUpdateSettings={handleUpdateSettings}
                 users={users}
                 onCreateUser={handleCreateUser}
                 onUpdateUser={handleUpdateUser}
                 onDeleteUser={handleDeleteUser}
+                onMigrateData={handleMigrateData}
+                onCreateCompany={handleCreateCompany}
+                onUpdateCompany={handleUpdateCompany}
+                companies={companies}
                 darkMode={darkMode}
                 setDarkMode={setDarkMode}
               />
@@ -1433,7 +1627,7 @@ export default function App() {
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />
             ) : activeTab === "schedule" ? (
               <ScheduleView 
-                isAdmin={userProfile?.role === "admin"} 
+                isAdmin={userProfile?.role === "admin" || userProfile?.role === "superadmin"} 
                 schedules={schedules}
                 onAdd={handleCreateSchedule}
                 onDelete={handleDeleteSchedule}

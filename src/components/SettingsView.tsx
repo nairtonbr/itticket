@@ -1,25 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette, Pencil } from "lucide-react";
-import { AppSettings, ClientName, UserProfile, UserRole, TicketStatus } from "../types";
+import { AppSettings, ClientName, UserProfile, UserRole, TicketStatus, Company } from "../types";
 import { CLIENTS, STATUSES } from "../constants";
 import { testWhatsAppConnection, checkInstanceStatus } from "../utils/whatsappUtils";
 import { Send, Activity } from "lucide-react";
 
 interface SettingsViewProps {
   isAdmin: boolean;
+  userProfile: UserProfile | null;
+  company: Company | null;
   settings: AppSettings;
   onUpdateSettings: (settings: Partial<AppSettings>) => Promise<void>;
   users: UserProfile[];
   onCreateUser: (userData: any) => Promise<void>;
   onUpdateUser: (uid: string, data: Partial<UserProfile>) => Promise<void>;
   onDeleteUser: (uid: string) => Promise<void>;
+  onMigrateData: () => Promise<void>;
+  onCreateCompany: (companyData: Partial<Company>) => Promise<void>;
+  onUpdateCompany: (id: string, data: Partial<Company>) => Promise<void>;
+  companies: Company[];
   darkMode: boolean;
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export default function SettingsView({ isAdmin, settings, onUpdateSettings, users, onCreateUser, onUpdateUser, onDeleteUser, darkMode, setDarkMode }: SettingsViewProps) {
-  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp" | "status">("general");
+export default function SettingsView({ 
+  isAdmin, 
+  userProfile,
+  company,
+  settings, 
+  onUpdateSettings, 
+  users, 
+  onCreateUser, 
+  onUpdateUser, 
+  onDeleteUser, 
+  onMigrateData,
+  onCreateCompany,
+  onUpdateCompany,
+  companies,
+  darkMode, 
+  setDarkMode 
+}: SettingsViewProps) {
+  const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp" | "status" | "superadmin">("general");
+  const [newCompany, setNewCompany] = useState<Partial<Company>>({ active: true });
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
   const [evolutionApiUrl, setEvolutionApiUrl] = useState(settings.evolutionApiUrl || "");
@@ -49,6 +72,8 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
   });
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<UserProfile>>({});
+  const [editingCompany, setEditingCompany] = useState<string | null>(null);
+  const [editCompanyData, setEditCompanyData] = useState<Partial<Company>>({});
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [testNumber, setTestNumber] = useState("");
   const [isTesting, setIsTesting] = useState(false);
@@ -415,6 +440,19 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
           <Palette className="w-4 h-4" />
           Status
         </button>
+        {userProfile?.role === 'superadmin' && (
+          <button
+            onClick={() => setActiveTab("superadmin")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeTab === "superadmin" 
+                ? "bg-white dark:bg-zinc-700 text-purple-600 dark:text-purple-400 shadow-sm" 
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            Super Admin
+          </button>
+        )}
       </div>
 
       {activeTab === "general" && (
@@ -1023,8 +1061,22 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                     <option value="admin">Administrador</option>
                     <option value="user">Usuário (Técnico)</option>
                     <option value="client">Cliente</option>
+                    {userProfile?.role === 'superadmin' && <option value="superadmin">Super Admin</option>}
                   </select>
                 </div>
+                {userProfile?.role === 'superadmin' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Empresa</label>
+                    <select
+                      value={newUser.companyId || ""}
+                      onChange={(e) => setNewUser({ ...newUser, companyId: e.target.value })}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
+                    >
+                      <option value="">Selecione a Empresa</option>
+                      {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 {newUser.role === "client" && (
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Cliente Associado</label>
@@ -1053,6 +1105,9 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Usuário</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Email</th>
+                  {userProfile?.role === 'superadmin' && (
+                    <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Empresa</th>
+                  )}
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Função</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Associação</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-right">Ações</th>
@@ -1070,6 +1125,23 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-zinc-500 dark:text-zinc-400">{u.email}</td>
+                    {userProfile?.role === 'superadmin' && (
+                      <td className="px-6 py-4">
+                        {editingUser === u.uid ? (
+                          <select
+                            value={editData.companyId || u.companyId}
+                            onChange={(e) => setEditData({ ...editData, companyId: e.target.value })}
+                            className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
+                          >
+                            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        ) : (
+                          <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-lg">
+                            {u.companyId}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       {editingUser === u.uid ? (
                         <select
@@ -1159,6 +1231,166 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                 ))}
               </tbody>
             </table>
+          </div>
+        </motion.div>
+      )}
+      {activeTab === "superadmin" && userProfile?.role === 'superadmin' && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-8"
+        >
+          <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Ferramentas de Super Admin</h3>
+            </div>
+            
+            <div className="p-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 space-y-4">
+              <h4 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Migração de Dados Legados
+              </h4>
+              <p className="text-sm text-red-600 dark:text-red-300">
+                Esta ferramenta migra todos os tickets, usuários e agendas que não possuem um ID de empresa para a empresa padrão "itmanage".
+                Use isso apenas uma vez após a atualização para o sistema multi-empresa.
+              </p>
+              <button
+                onClick={onMigrateData}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-all flex items-center gap-2"
+              >
+                <Activity className="w-4 h-4" />
+                Iniciar Migração
+              </button>
+            </div>
+
+            <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Cadastrar Nova Empresa</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-1">ID da Empresa (slug)</label>
+                  <input
+                    type="text"
+                    value={newCompany.id || ""}
+                    onChange={(e) => setNewCompany({ ...newCompany, id: e.target.value })}
+                    placeholder="ex: nova-empresa"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest px-1">Nome da Empresa</label>
+                  <input
+                    type="text"
+                    value={newCompany.name || ""}
+                    onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+                    placeholder="Ex: Nova Empresa LTDA"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium dark:text-white"
+                  />
+                </div>
+              </div>
+              
+              <button
+                onClick={() => {
+                  if (newCompany.id && newCompany.name) {
+                    onCreateCompany(newCompany);
+                    setNewCompany({ active: true });
+                  }
+                }}
+                className="bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold px-8 py-3 rounded-xl hover:opacity-90 transition-all"
+              >
+                Criar Empresa
+              </button>
+            </div>
+
+            <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Empresas Multi-Empresa</h3>
+              </div>
+
+              <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-100 dark:border-zinc-800">
+                      <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">ID (Slug)</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Nome da Empresa</th>
+                      <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {companies.map((c) => (
+                      <tr key={c.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400 font-mono">{c.id}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {editingCompany === c.id ? (
+                            <input
+                              type="text"
+                              value={editCompanyData.name || c.name}
+                              onChange={(e) => setEditCompanyData({ ...editCompanyData, name: e.target.value })}
+                              className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
+                            />
+                          ) : (
+                            <span className="text-sm font-bold text-zinc-900 dark:text-white">{c.name}</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            {editingCompany === c.id ? (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    onUpdateCompany(c.id, editCompanyData);
+                                    setEditingCompany(null);
+                                    setEditCompanyData({});
+                                  }}
+                                  className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                                  title="Salvar"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingCompany(null);
+                                    setEditCompanyData({});
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setEditingCompany(c.id);
+                                  setEditCompanyData({ name: c.name });
+                                }}
+                                className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                title="Editar"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </motion.div>
       )}

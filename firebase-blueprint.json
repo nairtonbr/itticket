@@ -1,16 +1,31 @@
 {
   "entities": {
+    "Company": {
+      "title": "Company",
+      "description": "A company (tenant) in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "active": { "type": "boolean" },
+        "settings": { "$ref": "Settings" }
+      },
+      "required": ["id", "name", "active"]
+    },
     "Ticket": {
       "title": "Ticket",
       "description": "A support ticket",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "companyId": { "type": "string" },
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "client": { "type": "string", "enum": ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo"] },
+        "client": { "type": "string" },
         "status": { "type": "string", "enum": ["Aberto", "Em Andamento", "Aguardando Cliente", "Aguardando Terceiros", "Resolvido"] },
-        "category": { "type": "string", "enum": ["ENGENHARIA IP", "INFRAESTRUTURA", "NOC", "PROJETOS", "NÍVEL3"] },
+        "category": { "type": "string" },
         "responsible": { "type": "string" },
         "sla": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -25,30 +40,20 @@
               "timestamp": { "type": "string", "format": "date-time" }
             }
           }
-        },
-        "attachments": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "url": { "type": "string" },
-              "type": { "type": "string" },
-              "size": { "type": "number" }
-            }
-          }
         }
       },
-      "required": ["title", "client", "status", "createdAt"]
+      "required": ["companyId", "title", "client", "status", "createdAt"]
     },
     "Settings": {
       "title": "Settings",
-      "description": "Application settings",
+      "description": "Application settings per company",
       "type": "object",
       "properties": {
         "webhookUrl": { "type": "string" },
         "clientLogos": { "type": "object" },
-        "clientResponsibles": { "type": "object" }
+        "clientResponsibles": { "type": "object" },
+        "customClients": { "type": "array", "items": { "type": "string" } },
+        "customCategories": { "type": "array", "items": { "type": "string" } }
       }
     },
     "User": {
@@ -57,12 +62,13 @@
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
+        "companyId": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "user", "client"] },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "user", "client", "pending"] },
         "associatedClient": { "type": "string" }
       },
-      "required": ["uid", "email"]
+      "required": ["uid", "companyId", "email"]
     },
     "Schedule": {
       "title": "Schedule",
@@ -70,22 +76,23 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "companyId": { "type": "string" },
         "analyst": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "endDate": { "type": "string", "format": "date" },
         "shift": { "type": "string" }
       },
-      "required": ["analyst", "date", "shift"]
+      "required": ["companyId", "analyst", "date", "shift"]
     }
   },
   "firestore": {
+    "/companies/{companyId}": {
+      "schema": "Company",
+      "description": "Collection of companies"
+    },
     "/tickets/{ticketId}": {
       "schema": "Ticket",
       "description": "Collection of support tickets"
-    },
-    "/settings/global": {
-      "schema": "Settings",
-      "description": "Global application settings"
     },
     "/users/{userId}": {
       "schema": "User",

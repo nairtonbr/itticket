@@ -19,6 +19,7 @@ export interface TicketUpdate {
 
 export interface Ticket {
   id: string;
+  companyId: string;
   title: string;
   description: string;
   client: ClientName;
@@ -44,6 +45,15 @@ export interface Ticket {
     timestamp: string;
     details: string;
   }[];
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  logo?: string;
+  createdAt: any;
+  active: boolean;
+  settings: AppSettings;
 }
 
 export interface AppSettings {
@@ -73,13 +83,23 @@ export interface AppSettings {
   statusColors?: Record<string, string>; // Status -> Hex Color
 }
 
-export type UserRole = "admin" | "user" | "client" | "pending";
+export type UserRole = "superadmin" | "admin" | "user" | "client" | "pending";
 
 export interface UserProfile {
   uid: string;
+  companyId: string;
   email: string;
   displayName: string;
   role: UserRole;
   associatedClient?: ClientName;
   token?: string;
+}
+
+export interface Schedule {
+  id: string;
+  companyId: string;
+  analyst: string;
+  date: string;
+  endDate?: string;
+  shift: string;
 }
