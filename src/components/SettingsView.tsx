@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette } from "lucide-react";
+import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette, Pencil } from "lucide-react";
 import { AppSettings, ClientName, UserProfile, UserRole, TicketStatus } from "../types";
 import { CLIENTS, STATUSES } from "../constants";
 import { testWhatsAppConnection, checkInstanceStatus } from "../utils/whatsappUtils";
@@ -1146,7 +1146,7 @@ export default function SettingsView({ isAdmin, settings, onUpdateSettings, user
                               className="p-2 text-zinc-400 hover:text-blue-600 transition-colors"
                               title="Editar"
                             >
-                              <Plus className="w-4 h-4" />
+                              <Pencil className="w-4 h-4" />
                             </button>
                             <button onClick={() => handleDeleteUser(u.uid)} className="p-2 text-zinc-400 hover:text-red-500 transition-colors" title="Excluir">
                               <Trash2 className="w-4 h-4" />
