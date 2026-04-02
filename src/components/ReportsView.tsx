@@ -5,7 +5,7 @@ import { Ticket, ClientName, TicketStatus, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, CATEGORIES, PRIORITIES } from "../constants";
 import { getTicketSlaStatus } from "../utils/ticketUtils";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+import * as htmlToImage from 'html-to-image';
 import { 
   BarChart, 
   Bar, 
@@ -306,12 +306,13 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
     if (!reportRef.current) return;
     setIsExporting(true);
     try {
-      const canvas = await html2canvas(reportRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      const canvas = await htmlToImage.toCanvas(reportRef.current, {
+        pixelRatio: 2,
         backgroundColor: darkMode ? "#09090b" : "#ffffff",
-        windowWidth: 1400 // Ensure consistent width for capture
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+        }
       });
       
       const imgData = canvas.toDataURL("image/png");
