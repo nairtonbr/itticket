@@ -122,7 +122,7 @@
 }
 
 .rbc-header {
-  @apply !border-zinc-100 dark:!border-zinc-800/30 !py-3 !text-[10px] !font-black !uppercase !tracking-widest !text-zinc-400 dark:!text-zinc-500 !bg-zinc-50/30 dark:!bg-zinc-800/20;
+  @apply !border-zinc-100 dark:!border-zinc-800/30 !py-3 !text-[12px] !font-black !uppercase !tracking-widest !text-zinc-400 dark:!text-zinc-500 !bg-zinc-50/30 dark:!bg-zinc-800/20;
 }
 
 .rbc-month-view {
@@ -154,7 +154,7 @@
 }
 
 .rbc-date-cell {
-  @apply !p-1.5 !text-[10px] !font-black !text-zinc-400 dark:!text-zinc-600 transition-all;
+  @apply !p-1.5 !text-[12px] !font-black !text-zinc-400 dark:!text-zinc-600 transition-all;
 }
 
 .rbc-date-cell.rbc-now {
@@ -170,7 +170,7 @@
 }
 
 .rbc-show-more {
-  @apply !text-[10px] !font-black !uppercase !text-blue-600 dark:!text-blue-400 !bg-transparent hover:!underline;
+  @apply !text-[12px] !font-black !uppercase !text-blue-600 dark:!text-blue-400 !bg-transparent hover:!underline;
 }
 
 .rbc-toolbar {

@@ -66,7 +66,8 @@ import {
   createUserWithEmailAndPassword,
   getAuth,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { initializeApp, getApps, getApp } from "firebase/app";
 
@@ -524,10 +525,32 @@ export default function App() {
         setLoginError("O login por e-mail/senha não está ativado. Por favor, use o 'Google Login' abaixo.");
       } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         setLoginError("E-mail ou senha incorretos.");
+      } else if (error.code === 'auth/too-many-requests') {
+        setLoginError("Muitas tentativas falhas. Tente novamente mais tarde.");
       } else {
         setLoginError("Erro ao realizar login. Tente novamente.");
       }
       setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginEmail) {
+      setLoginError("Por favor, digite seu e-mail primeiro.");
+      return;
+    }
+    
+    try {
+      await sendPasswordResetEmail(auth, loginEmail);
+      toast.success("E-mail de recuperação enviado!");
+      setLoginError("");
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      if (error.code === 'auth/user-not-found') {
+        setLoginError("E-mail não encontrado no sistema.");
+      } else {
+        setLoginError("Erro ao enviar e-mail de recuperação.");
+      }
     }
   };
 
@@ -971,13 +994,15 @@ export default function App() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">E-mail</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+              <div className="relative group">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="email" 
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   required
+                  autoComplete="email"
+                  autoCapitalize="none"
                   placeholder="seu@email.com"
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl pl-12 pr-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
@@ -986,33 +1011,62 @@ export default function App() {
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+              <div className="relative group">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-blue-500 transition-colors" />
                 <input 
                   type="password" 
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   required
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl pl-12 pr-4 py-4 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium dark:text-white"
                 />
               </div>
             </div>
 
-            {loginError && (
-              <div className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 rounded-2xl text-sm font-medium flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                {loginError}
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {loginError && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0, y: -10 }}
+                  animate={{ opacity: 1, height: "auto", y: 0 }}
+                  exit={{ opacity: 0, height: 0, y: -10 }}
+                  className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 p-4 rounded-2xl text-sm font-bold flex items-start gap-3 shadow-sm"
+                >
+                  <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+                  <span>{loginError}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <button 
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-blue-100 dark:shadow-none flex items-center justify-center gap-3 group"
-            >
-              Entrar no Sistema
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
+            <div className="space-y-4">
+              <motion.button 
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-5 rounded-2xl transition-all shadow-xl shadow-blue-500/20 flex items-center justify-center gap-3 group disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    Entrar no Sistema
+                    <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </motion.button>
+
+              <div className="text-center">
+                <button 
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-xs font-bold text-zinc-400 hover:text-blue-600 dark:text-zinc-500 dark:hover:text-blue-400 uppercase tracking-widest transition-colors"
+                >
+                  Esqueci minha senha?
+                </button>
+              </div>
+            </div>
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center">

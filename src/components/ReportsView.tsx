@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { BarChart3, PieChart as PieChartIcon, Calendar, Filter, Download, ChevronDown, CheckCircle2, AlertCircle, Clock, Users, ShieldAlert, Tag, TrendingUp, Loader2 } from "lucide-react";
 import { Ticket, ClientName, TicketStatus, TicketPriority } from "../types";
 import { CLIENTS, STATUSES, STATUS_COLORS, CATEGORIES, PRIORITIES } from "../constants";
+import { getTicketSlaStatus } from "../utils/ticketUtils";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { 
@@ -208,8 +209,49 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
   const slaCompliance = useMemo(() => {
     const resolved = filteredTickets.filter(t => t.status === "Resolvido");
     if (resolved.length === 0) return 100;
-    // Simulação: 85% dos resolvidos estão dentro do SLA
-    return 85;
+    
+    const withinSla = resolved.filter(t => {
+      const status = getTicketSlaStatus(t);
+      return status !== "expired";
+    }).length;
+    
+    return Math.round((withinSla / resolved.length) * 100);
+  }, [filteredTickets]);
+
+  const mttrData = useMemo(() => {
+    const resolved = filteredTickets.filter(t => t.status === "Resolvido");
+    if (resolved.length === 0) return 0;
+    
+    const totalResolutionTime = resolved.reduce((acc, t) => {
+      const created = getFirestoreDate(t.createdAt);
+      const updated = getFirestoreDate(t.updatedAt);
+      if (created && updated) {
+        return acc + (updated.getTime() - created.getTime());
+      }
+      return acc;
+    }, 0);
+    
+    // Return in hours
+    return totalResolutionTime / (1000 * 60 * 60 * resolved.length);
+  }, [filteredTickets]);
+
+  const mttrByCategory = useMemo(() => {
+    const categories = Array.from(new Set(filteredTickets.map(t => t.category).filter(Boolean)));
+    return categories.map(cat => {
+      const resolvedInCat = filteredTickets.filter(t => t.category === cat && t.status === "Resolvido");
+      if (resolvedInCat.length === 0) return { name: cat, value: 0 };
+      
+      const totalTime = resolvedInCat.reduce((acc, t) => {
+        const created = getFirestoreDate(t.createdAt);
+        const updated = getFirestoreDate(t.updatedAt);
+        if (created && updated) {
+          return acc + (updated.getTime() - created.getTime());
+        }
+        return acc;
+      }, 0);
+      
+      return { name: cat, value: totalTime / (1000 * 60 * 60 * resolvedInCat.length) };
+    }).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   }, [filteredTickets]);
   
   const timeData = useMemo(() => {
@@ -391,11 +433,12 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
       </div>
 
       <div ref={reportRef} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <StatCard label="Volume Total" value={filteredTickets.length} icon={<BarChart3 />} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" />
           <StatCard label="Horas Trabalhadas" value={formatHoursToHMin(filteredTickets.reduce((acc, t) => acc + (t.totalHours || 0), 0))} icon={<Clock />} color="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" />
+          <StatCard label="SLA Compliance" value={`${slaCompliance}%`} icon={<ShieldAlert />} color={slaCompliance < 80 ? "bg-red-500/10 text-red-600" : "bg-green-500/10 text-green-600"} />
+          <StatCard label="MTTR (Média)" value={formatHoursToHMin(mttrData)} icon={<TrendingUp />} color="bg-purple-500/10 text-purple-600" />
           <TopResponsibleCard name={topResponsible.name} hours={topResponsible.value} />
-          <TopClientCard name={topClient.name} hours={topClient.value} />
         </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -530,6 +573,37 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
           className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
         >
           <div className="flex items-center gap-3 mb-6">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-purple-600" />
+            </div>
+            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">MTTR por Categoria (Horas)</h3>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mttrByCategory} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
+                <XAxis type="number" hide />
+                <YAxis 
+                  dataKey="name" 
+                  type="category"
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#52525b' : '#a1a1aa' }}
+                  width={100}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} />
+                <Bar dataKey="value" name="Horas" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
+        >
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
               <Users className="w-4 h-4 text-blue-600" />
             </div>
@@ -550,38 +624,6 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
                 />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} />
                 <Bar dataKey="value" name="Horas" fill="#3b82f6" radius={[0, 6, 6, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="bg-white dark:bg-zinc-900 p-6 rounded-[2rem] border border-zinc-100 dark:border-zinc-800 shadow-sm"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-emerald-600" />
-            </div>
-            <h3 className="text-xs font-black text-zinc-900 dark:text-white uppercase tracking-widest">Horas por Cliente</h3>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={hoursByClient} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={darkMode ? "#27272a" : "#f4f4f5"} />
-                <XAxis type="number" hide />
-                <YAxis 
-                  dataKey="name" 
-                  type="category"
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fontWeight: 700, fill: darkMode ? '#52525b' : '#a1a1aa' }}
-                  width={100}
-                />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} />
-                <Bar dataKey="value" name="Horas" fill="#10b981" radius={[0, 6, 6, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -855,25 +897,40 @@ export function ReportsView({ tickets, darkMode, allClients }: ReportsViewProps)
 );
 }
 
+function StatCard({ label, value, icon, color }: { label: string, value: string | number, icon: React.ReactNode, color: string }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center gap-4 group hover:border-blue-500/50 transition-all duration-500"
+    >
+      <div className={`w-12 h-12 rounded-2xl ${color} flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500`}>
+        <div className="w-6 h-6">
+          {icon}
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className="text-2xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none mb-1">{value}</p>
+        <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest truncate">{label}</p>
+      </div>
+    </motion.div>
+  );
+}
+
 function TopClientCard({ name, hours }: { name: string, hours: number }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col gap-4 group hover:border-indigo-500/50 transition-all duration-500 relative overflow-hidden"
+      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center gap-4 group hover:border-indigo-500/50 transition-all duration-500"
     >
-      <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-        <TrendingUp className="w-24 h-24 text-zinc-900 dark:text-white" />
+      <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500">
+        <Users className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
       </div>
-      
-      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500">
-        <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-      </div>
-      
-      <div className="space-y-0.5 relative z-10">
-        <p className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight uppercase truncate" title={name}>{name}</p>
-        <p className="text-sm font-black text-indigo-600 dark:text-indigo-400 leading-none mt-1">{formatHoursToHMin(hours)}</p>
-        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-2">Top Cliente</p>
+      <div className="min-w-0">
+        <p className="text-sm font-black text-zinc-900 dark:text-white truncate">{name}</p>
+        <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mt-0.5">{formatHoursToHMin(hours)}</p>
+        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-1">Top Cliente</p>
       </div>
     </motion.div>
   );
@@ -884,41 +941,15 @@ function TopResponsibleCard({ name, hours }: { name: string, hours: number }) {
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-zinc-900 dark:bg-zinc-800 p-5 rounded-[1.75rem] border border-zinc-800 dark:border-zinc-700 shadow-xl flex flex-col gap-4 group hover:scale-[1.02] transition-all duration-500 relative overflow-hidden"
+      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex items-center gap-4 group hover:border-blue-500/50 transition-all duration-500"
     >
-      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <Users className="w-24 h-24 text-white" />
+      <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shrink-0 transition-all group-hover:scale-110 group-hover:rotate-3 duration-500">
+        <ShieldAlert className="w-6 h-6 text-blue-600 dark:text-blue-400" />
       </div>
-      
-      <div className="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
-        <Users className="w-5 h-5 text-zinc-900" />
-      </div>
-      
-      <div className="space-y-0.5 relative z-10">
-        <p className="text-2xl font-black text-white tracking-tight uppercase truncate" title={name}>{name}</p>
-        <p className="text-sm font-black text-amber-400 leading-none mt-1">{formatHoursToHMin(hours)}</p>
-        <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-2">Melhor Responsável</p>
-      </div>
-    </motion.div>
-  );
-}
-
-function StatCard({ label, value, subValue, icon, color }: { label: string, value: string | number, subValue?: string, icon: React.ReactNode, color: string }) {
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-zinc-900 p-5 rounded-[1.75rem] border border-zinc-100 dark:border-zinc-800 shadow-sm flex flex-col gap-4 group hover:border-blue-500/50 transition-all duration-500"
-    >
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 duration-500 ${color}`}>
-        <div className="w-5 h-5">
-          {icon}
-        </div>
-      </div>
-      <div className="space-y-0.5">
-        <p className="text-3xl font-black text-zinc-900 dark:text-white tracking-tighter leading-none truncate" title={String(value)}>{value}</p>
-        {subValue && <p className="text-xs font-black text-blue-600 dark:text-blue-400 leading-none mt-1">{subValue}</p>}
-        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">{label}</p>
+      <div className="min-w-0">
+        <p className="text-sm font-black text-zinc-900 dark:text-white truncate">{name}</p>
+        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mt-0.5">{formatHoursToHMin(hours)}</p>
+        <p className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-1">Top Responsável</p>
       </div>
     </motion.div>
   );

@@ -142,7 +142,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                 <div className={`p-1 rounded-md ${item.color} bg-opacity-10 text-opacity-100 ${item.color.replace('bg-', 'text-')}`}>
                   {item.icon}
                 </div>
-                <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{item.label}</span>
+                <span className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">{item.label}</span>
               </div>
             ))}
           </div>
@@ -245,7 +245,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                 const isToday = moment(date).isSame(moment(), 'day');
                 return (
                   <div className={`flex items-center justify-end p-1 ${isToday ? "text-blue-600 dark:text-blue-400" : ""}`}>
-                    <span className={`text-[10px] font-black ${isToday ? "scale-110" : "opacity-40"}`}>
+                    <span className={`text-[12px] font-black ${isToday ? "scale-110" : "opacity-40"}`}>
                       {label}
                     </span>
                   </div>
@@ -265,12 +265,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
                 const colorClass = res.priority ? priorityColors[res.priority] : "bg-blue-600 border-blue-700/50 text-white";
 
                 return (
-                  <div className={`group relative px-1.5 py-0.5 rounded-sm text-[8px] font-bold shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden flex items-center gap-1 border ${colorClass}`}>
-                    <div className="flex shrink-0 items-center justify-center bg-white/20 rounded-xs px-0.5 font-black text-[7px]">
+                  <div className={`group relative px-1.5 py-0.5 rounded-sm text-[10px] font-bold shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 overflow-hidden flex items-center gap-1 border ${colorClass}`}>
+                    <div className="flex shrink-0 items-center justify-center bg-white/20 rounded-xs px-0.5 font-black text-[8px]">
                       #{res.id}
                     </div>
                     <span className="truncate opacity-95 tracking-tight">{res.client}</span>
-                    <div className="px-1 rounded-xs bg-black/10 text-[7px] font-black uppercase tracking-tighter shrink-0 border border-white/5">
+                    <div className="px-1 rounded-xs bg-black/10 text-[8px] font-black uppercase tracking-tighter shrink-0 border border-white/5">
                       {res.responsible}
                     </div>
                     {res.priority === "Urgente" && (
@@ -288,12 +288,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
               const dotColor = "bg-rose-500/50";
 
               return (
-                <div className={`group relative px-1.5 py-0.5 rounded-sm text-[9px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColor}`}>
+                <div className={`group relative px-1.5 py-0.5 rounded-sm text-[11px] font-medium border transition-all hover:shadow-md hover:-translate-y-0.5 ${shiftColor}`}>
                   <div className="flex items-center justify-between gap-1">
                     <div className="flex items-center gap-1 truncate">
                       <div className={`w-1 h-1 rounded-full shrink-0 shadow-sm ${dotColor}`} />
                       <span className="truncate tracking-tight opacity-90">{res.analyst}</span>
-                      <span className="px-0.5 rounded-xs bg-white/20 text-[7px] font-black uppercase tracking-tighter shrink-0">Plantão</span>
+                      <span className="px-0.5 rounded-xs bg-white/20 text-[8px] font-black uppercase tracking-tighter shrink-0">Plantão</span>
                     </div>
                     <div className="opacity-10 group-hover:opacity-100 transition-opacity shrink-0">
                       {shiftIcon}
