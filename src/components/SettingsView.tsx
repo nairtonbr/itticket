@@ -87,6 +87,15 @@ export default function SettingsView({
     return Array.from(all).sort();
   }, [clientResponsibles]);
 
+  const getCompanyClients = (companyId?: string) => {
+    if (!companyId) return [...CLIENTS, ...customClients].sort();
+    const targetCompany = companies.find(c => c.id === companyId);
+    if (targetCompany) {
+      return [...(targetCompany.settings?.customClients || [])].sort();
+    }
+    return [...CLIENTS, ...customClients].sort();
+  };
+
   useEffect(() => {
     setWebhookUrl(settings.webhookUrl || "");
     setWebhookEnabled(settings.webhookEnabled ?? true);
@@ -1069,7 +1078,10 @@ export default function SettingsView({
                     <label className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest px-1">Empresa</label>
                     <select
                       value={newUser.companyId || ""}
-                      onChange={(e) => setNewUser({ ...newUser, companyId: e.target.value })}
+                      onChange={(e) => {
+                        const newCompanyId = e.target.value;
+                        setNewUser({ ...newUser, companyId: newCompanyId, associatedClient: "" });
+                      }}
                       className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
                     >
                       <option value="">Selecione a Empresa</option>
@@ -1087,7 +1099,7 @@ export default function SettingsView({
                     >
                       <option value="">Selecione um cliente</option>
                       <option value="Todos">Todos</option>
-                      {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                      {getCompanyClients(newUser.companyId || userProfile?.companyId).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
                 )}
@@ -1130,7 +1142,10 @@ export default function SettingsView({
                         {editingUser === u.uid ? (
                           <select
                             value={editData.companyId || u.companyId}
-                            onChange={(e) => setEditData({ ...editData, companyId: e.target.value })}
+                            onChange={(e) => {
+                              const newCompanyId = e.target.value;
+                              setEditData({ ...editData, companyId: newCompanyId, associatedClient: "" });
+                            }}
                             className="bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white"
                           >
                             {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1175,7 +1190,7 @@ export default function SettingsView({
                         >
                           <option value="">Nenhum</option>
                           <option value="Todos">Todos</option>
-                          {[...CLIENTS, ...customClients].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                          {getCompanyClients(editData.companyId || u.companyId).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       ) : (
                         u.associatedClient ? (
