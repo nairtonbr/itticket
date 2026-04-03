@@ -100,7 +100,9 @@ service cloud.firestore {
                     (isSuperAdmin() || (request.auth.uid == userId && request.resource.data.role == 'pending'));
       
       allow update: if isAuthenticated() && 
-                    (isSuperAdmin() || (isAdmin() && getCompanyId() == resource.data.companyId) || (request.auth.uid == userId && request.resource.data.role == resource.data.role));
+                    (isSuperAdmin() || 
+                     (isAdmin() && getCompanyId() == resource.data.companyId && request.resource.data.role != 'superadmin') || 
+                     (request.auth.uid == userId && request.resource.data.role == resource.data.role));
     }
 
     match /tickets/{ticketId} {

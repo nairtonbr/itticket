@@ -1168,6 +1168,7 @@ export default function SettingsView({
                           <option value="user">Usuário (Técnico)</option>
                           <option value="client">Cliente</option>
                           <option value="pending">Pendente</option>
+                          {userProfile?.role === 'superadmin' && <option value="superadmin">Super Admin</option>}
                         </select>
                       ) : (
                         <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase flex items-center gap-1.5 w-fit ${

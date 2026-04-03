@@ -9,7 +9,6 @@ import {
   Sun, 
   Search, 
   Filter, 
-  Bell,
   User as UserIcon,
   ChevronRight,
   LayoutDashboard,
@@ -121,10 +120,6 @@ export default function App() {
       (t.id || "").toLowerCase().includes(lowerQuery)
     ).slice(0, 8);
   }, [searchQuery, tickets]);
-
-  const newTicketsCount = useMemo(() => {
-    return tickets.filter(t => t.status === "Aberto" && !t.archived).length;
-  }, [tickets]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -831,11 +826,20 @@ export default function App() {
       const historyEntries: any[] = [];
 
       if (originalTicket) {
+        const fieldLabels: Record<string, string> = {
+          status: 'Status',
+          priority: 'Prioridade',
+          responsible: 'Responsável',
+          category: 'Categoria',
+          title: 'Título',
+          description: 'Descrição'
+        };
+
         const trackableFields: (keyof Ticket)[] = ['status', 'priority', 'responsible', 'category', 'title', 'description'];
         trackableFields.forEach(field => {
           if (updates[field] !== undefined && updates[field] !== originalTicket[field]) {
             historyEntries.push({
-              action: `Alteração de ${field}`,
+              action: `Alteração de ${fieldLabels[field] || field}`,
               user: author,
               timestamp: now,
               details: `De "${originalTicket[field] || 'N/A'}" para "${updates[field]}"`
@@ -1559,14 +1563,6 @@ export default function App() {
                 className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400"
               >
                 {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              <button className="p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-2xl transition-all text-zinc-500 dark:text-zinc-400 relative">
-                <Bell className="w-5 h-5" />
-                {newTicketsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-zinc-900 flex items-center justify-center px-1">
-                    {newTicketsCount}
-                  </span>
-                )}
               </button>
               
               {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (

@@ -647,6 +647,45 @@ export default function TicketModal({ isOpen, onClose, ticket, onCreate, onUpdat
                     </div>
                   </div>
 
+                  {/* Histórico Recente Section */}
+                  {ticket && ticket.history && ticket.history.length > 0 && (
+                    <div className="pt-8 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <History className="w-4 h-4 text-zinc-400" />
+                          <h3 className="text-xs font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">Histórico de Alterações</h3>
+                        </div>
+                        <button 
+                          onClick={() => setActiveModalTab("history")}
+                          className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline uppercase tracking-widest"
+                        >
+                          Ver Tudo
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {ticket.history.slice().reverse().slice(0, 3).map((entry, i) => (
+                          <div key={i} className="flex gap-3 items-start p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-700">
+                            <div className="w-6 h-6 rounded-full bg-white dark:bg-zinc-900 border border-blue-500/30 flex items-center justify-center shrink-0">
+                              <Clock className="w-3 h-3 text-blue-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[11px] font-black text-zinc-900 dark:text-white truncate">{entry.action}</span>
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest shrink-0">
+                                  {formatFirestoreDate(entry.timestamp, "dd/MM HH:mm")}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                                <span className="font-bold">{entry.user}</span>: {entry.details}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Save Button in Details */}
                   <div className="pt-8">
                     <button
