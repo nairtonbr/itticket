@@ -1008,7 +1008,7 @@ export default function App() {
         .map(d => updateDoc(doc(db, "schedules", d.id), { companyId: defaultCompanyId }));
 
       // 5. Set default clients for itmanage
-      const itmanageClients = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo"];
+      const itmanageClients = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"];
       const itmanageDoc = await getDoc(doc(db, "companies", "itmanage"));
       if (itmanageDoc.exists()) {
         await updateDoc(doc(db, "companies", "itmanage"), {

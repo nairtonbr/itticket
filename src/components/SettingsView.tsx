@@ -91,7 +91,9 @@ export default function SettingsView({
     if (!companyId) return [...CLIENTS, ...customClients].sort();
     const targetCompany = companies.find(c => c.id === companyId);
     if (targetCompany) {
-      return [...(targetCompany.settings?.customClients || [])].sort();
+      const custom = targetCompany.settings?.customClients || [];
+      if (custom.length > 0) return [...custom].sort();
+      return [...CLIENTS].sort();
     }
     return [...CLIENTS, ...customClients].sort();
   };
