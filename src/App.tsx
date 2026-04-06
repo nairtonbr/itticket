@@ -97,6 +97,10 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  const currentCompanyId = useMemo(() => {
+    return selectedCompanyId || userProfile?.companyId;
+  }, [selectedCompanyId, userProfile?.companyId]);
+
   const normalize = (str?: string) => str?.trim().toLowerCase();
   
   // Refs to avoid stale closures in SLA monitor
@@ -134,8 +138,14 @@ export default function App() {
   const allClients = React.useMemo(() => {
     const custom = settings.customClients || [];
     if (custom.length > 0) return custom.sort();
+    
+    // Fallback específico para a itmanage caso o banco esteja vazio
+    if (currentCompanyId === 'itmanage') {
+      return ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"].sort();
+    }
+    
     return [...CLIENTS].sort();
-  }, [settings.customClients]);
+  }, [settings.customClients, currentCompanyId]);
 
   const allCategories = React.useMemo(() => {
     const custom = settings.customCategories || [];
@@ -164,7 +174,7 @@ export default function App() {
 
     // Only run if it's 09:00 Brasília time or later, and hasn't run today
     // We also check if the user is an admin because only admins can update the global settings
-    if (!userProfile?.companyId) return;
+    if (!currentCompanyId) return;
     if (userProfile?.role !== 'admin' && userProfile?.role !== 'superadmin') return;
     if (brasiliaHour < 9) return;
     if (currentSettings.lastSlaCheckDate === brasiliaDate) return;
@@ -173,7 +183,7 @@ export default function App() {
 
     // Update lastSlaCheckDate immediately to avoid race conditions from multiple clients
     try {
-      await updateDoc(doc(db, "companies", userProfile.companyId), {
+      await updateDoc(doc(db, "companies", currentCompanyId), {
         "settings.lastSlaCheckDate": brasiliaDate
       });
     } catch (error) {
@@ -243,13 +253,13 @@ export default function App() {
   }, []);
 
   const handleArchiveOldTickets = async () => {
-    if (!auth.currentUser || !userProfile?.companyId || (userProfile?.role !== "admin" && userProfile?.role !== "superadmin")) return;
+    if (!auth.currentUser || !currentCompanyId || (userProfile?.role !== "admin" && userProfile?.role !== "superadmin")) return;
     
     try {
       const thirtyDaysAgo = subDays(new Date(), 30);
       const q = query(
         collection(db, "tickets"),
-        where("companyId", "==", userProfile.companyId),
+        where("companyId", "==", currentCompanyId),
         where("status", "==", "Resolvido")
       );
       
@@ -419,9 +429,9 @@ export default function App() {
 
   // Real-time Data Fetching (Firestore)
   useEffect(() => {
-    if (!user || !userProfile || !userProfile.companyId) return;
+    if (!user || !userProfile || !currentCompanyId) return;
 
-    const companyId = selectedCompanyId || userProfile.companyId;
+    const companyId = currentCompanyId;
 
     // Tickets Subscription
     let ticketsQuery;
@@ -485,7 +495,7 @@ export default function App() {
     // Users Subscription (Admin only)
     let unsubUsers = () => {};
     if (userProfile.role === 'admin' || userProfile.role === 'superadmin') {
-      const usersQuery = userProfile.role === 'superadmin' 
+      const usersQuery = (userProfile.role === 'superadmin' && !selectedCompanyId)
         ? collection(db, "users")
         : query(collection(db, "users"), where("companyId", "==", companyId));
 
@@ -521,7 +531,7 @@ export default function App() {
       unsubUsers();
       unsubCompanies();
     };
-  }, [user, userProfile, showArchived, selectedCompanyId]);
+  }, [user, userProfile, showArchived, currentCompanyId, selectedCompanyId]);
 
   const greeting = React.useMemo(() => {
     const hour = new Date().getHours();
@@ -643,20 +653,36 @@ export default function App() {
     }
   };
 
-  const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
-    if (!userProfile?.companyId) return;
+  const handleDeleteCompany = async (id: string) => {
+    if (userProfile?.role !== 'superadmin') return;
+    if (id === 'itmanage') {
+      toast.error("A empresa principal não pode ser excluída.");
+      return;
+    }
+    if (!window.confirm(`Tem certeza que deseja excluir a empresa "${id}"? Esta ação é irreversível.`)) return;
+    
     try {
-      await updateDoc(doc(db, "companies", userProfile.companyId), {
+      await deleteDoc(doc(db, "companies", id));
+      toast.success("Empresa excluída com sucesso!");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `companies/${id}`);
+    }
+  };
+
+  const handleUpdateSettings = async (updates: Partial<AppSettings>) => {
+    if (!currentCompanyId) return;
+    try {
+      await updateDoc(doc(db, "companies", currentCompanyId), {
         settings: { ...settings, ...updates }
       });
       toast.success("Configurações salvas!");
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `companies/${userProfile.companyId}`);
+      handleFirestoreError(error, OperationType.WRITE, `companies/${currentCompanyId}`);
     }
   };
 
   const handleCreateUser = async (userData: any) => {
-    if (!userProfile?.companyId) return;
+    if (!currentCompanyId) return;
     const { email, password, ...profile } = userData;
     try {
       // Use a secondary app to create the user without logging out the admin
@@ -669,7 +695,7 @@ export default function App() {
       const profileData = {
         ...profile,
         uid,
-        companyId: profile.companyId || userProfile.companyId,
+        companyId: profile.companyId || currentCompanyId,
         email,
         createdAt: new Date().toISOString()
       };
@@ -710,10 +736,10 @@ export default function App() {
   };
 
   const handleCreateTicket = async (ticketData: Partial<Ticket>) => {
-    if (!userProfile?.companyId) return;
+    if (!currentCompanyId) return;
     try {
       const now = new Date().toISOString();
-      const companyId = userProfile.companyId;
+      const companyId = currentCompanyId;
       
       const ticketId = await runTransaction(db, async (transaction) => {
         const companyRef = doc(db, "companies", companyId);
@@ -1028,11 +1054,11 @@ export default function App() {
   };
 
   const handleCreateSchedule = async (scheduleData: any) => {
-    if (!userProfile?.companyId) return;
+    if (!currentCompanyId) return;
     try {
       await addDoc(collection(db, "schedules"), {
         ...scheduleData,
-        companyId: userProfile.companyId
+        companyId: currentCompanyId
       });
       toast.success("Agenda salva!");
     } catch (error) {
@@ -1615,9 +1641,11 @@ export default function App() {
                 onMigrateData={handleMigrateData}
                 onCreateCompany={handleCreateCompany}
                 onUpdateCompany={handleUpdateCompany}
+                onDeleteCompany={handleDeleteCompany}
                 companies={companies}
                 darkMode={darkMode}
                 setDarkMode={setDarkMode}
+                currentCompanyId={currentCompanyId}
               />
             ) : activeTab === "reports" ? (
               <ReportsView tickets={tickets} darkMode={darkMode} allClients={allClients} />

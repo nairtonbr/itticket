@@ -19,9 +19,11 @@ interface SettingsViewProps {
   onMigrateData: () => Promise<void>;
   onCreateCompany: (companyData: Partial<Company>) => Promise<void>;
   onUpdateCompany: (id: string, data: Partial<Company>) => Promise<void>;
+  onDeleteCompany: (id: string) => Promise<void>;
   companies: Company[];
   darkMode: boolean;
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
+  currentCompanyId?: string | null;
 }
 
 export default function SettingsView({ 
@@ -37,12 +39,19 @@ export default function SettingsView({
   onMigrateData,
   onCreateCompany,
   onUpdateCompany,
+  onDeleteCompany,
   companies,
   darkMode, 
-  setDarkMode 
+  setDarkMode,
+  currentCompanyId
 }: SettingsViewProps) {
   const [activeTab, setActiveTab] = useState<"general" | "clients" | "users" | "whatsapp" | "status" | "superadmin">("general");
   const [newCompany, setNewCompany] = useState<Partial<Company>>({ active: true });
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUser, setNewUser] = useState<Partial<UserProfile & { password?: string }>>({
+    role: "user",
+    companyId: currentCompanyId || userProfile?.companyId || ""
+  });
   const [webhookUrl, setWebhookUrl] = useState(settings.webhookUrl || "");
   const [webhookEnabled, setWebhookEnabled] = useState(settings.webhookEnabled ?? true);
   const [evolutionApiUrl, setEvolutionApiUrl] = useState(settings.evolutionApiUrl || "");
@@ -66,10 +75,6 @@ export default function SettingsView({
   const [newClientName, setNewClientName] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   
-  const [isAddingUser, setIsAddingUser] = useState(false);
-  const [newUser, setNewUser] = useState<Partial<UserProfile & { password?: string }>>({
-    role: "user"
-  });
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<UserProfile>>({});
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
@@ -88,14 +93,24 @@ export default function SettingsView({
   }, [clientResponsibles]);
 
   const getCompanyClients = (companyId?: string) => {
-    if (!companyId) return [...CLIENTS, ...customClients].sort();
-    const targetCompany = companies.find(c => c.id === companyId);
+    const targetId = companyId || userProfile?.companyId;
+    const targetCompany = companies.find(c => c.id === targetId);
+    
+    let custom: string[] = [];
     if (targetCompany) {
-      const custom = targetCompany.settings?.customClients || [];
-      if (custom.length > 0) return [...custom].sort();
-      return [...CLIENTS].sort();
+      custom = targetCompany.settings?.customClients || [];
+    } else if (!companyId) {
+      custom = customClients;
     }
-    return [...CLIENTS, ...customClients].sort();
+
+    if (custom.length > 0) return [...custom].sort();
+    
+    // Fallback para itmanage
+    if (targetId === 'itmanage') {
+      return ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"].sort();
+    }
+
+    return [...CLIENTS].sort();
   };
 
   useEffect(() => {
@@ -115,6 +130,12 @@ export default function SettingsView({
     setCustomCategories(settings.customCategories || []);
     setStatusColors(settings.statusColors || {});
   }, [settings]);
+
+  useEffect(() => {
+    if (currentCompanyId) {
+      setNewUser(prev => ({ ...prev, companyId: currentCompanyId }));
+    }
+  }, [currentCompanyId]);
 
   const handleAddClientPhone = () => {
     if (!newClientPhone.trim()) return;
@@ -279,7 +300,7 @@ export default function SettingsView({
 
   const handleAddClient = () => {
     if (!newClientName.trim()) return;
-    if (CLIENTS.includes(newClientName as any) || customClients.includes(newClientName)) {
+    if (getCompanyClients().includes(newClientName.trim())) {
       setMessage({ type: "error", text: "Este cliente já existe." });
       return;
     }
@@ -291,9 +312,20 @@ export default function SettingsView({
   };
 
   const handleRemoveClient = (client: string) => {
-    const newCustom = customClients.filter(c => c !== client);
+    let newCustom: string[] = [];
+    if (customClients.length > 0) {
+      newCustom = customClients.filter(c => c !== client);
+    } else if (userProfile?.companyId === 'itmanage') {
+      // Se for itmanage e não tiver customClients, inicializa com os defaults menos o excluído
+      const defaults = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"];
+      newCustom = defaults.filter(c => c !== client);
+    } else {
+      newCustom = [];
+    }
+    
     setCustomClients(newCustom);
     onUpdateSettings({ customClients: newCustom });
+    setMessage({ type: "success", text: `Cliente ${client} removido!` });
   };
 
   const handleAddCategory = () => {
@@ -795,7 +827,7 @@ export default function SettingsView({
             <p className="text-sm text-zinc-500 dark:text-zinc-400">Associe números específicos a cada cliente para notificações direcionadas.</p>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {([...CLIENTS, ...customClients].sort()).map(client => (
+              {getCompanyClients().map(client => (
                 <div key={client} className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-3">
                   <h4 className="text-sm font-bold text-zinc-900 dark:text-white">{client}</h4>
                   <div className="flex flex-wrap gap-2">
@@ -926,26 +958,24 @@ export default function SettingsView({
           </motion.div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[...CLIENTS, ...customClients].sort().map((client) => (
+            {getCompanyClients().map((client) => (
               <motion.div 
                 key={client}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6 relative group"
               >
-                {customClients.includes(client) && (
-                  <button 
-                    onClick={() => {
-                      if (window.confirm(`Tem certeza que deseja excluir o cliente "${client}"?`)) {
-                        handleRemoveClient(client);
-                      }
-                    }}
-                    className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-all"
-                    title="Remover Cliente"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <button 
+                  onClick={() => {
+                    if (window.confirm(`Tem certeza que deseja excluir o cliente "${client}"?`)) {
+                      handleRemoveClient(client);
+                    }
+                  }}
+                  className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-all"
+                  title="Remover Cliente"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 <div className="flex items-center justify-between pr-8">
                   <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{client}</h3>
                   {clientLogos[client] && (
@@ -1390,16 +1420,27 @@ export default function SettingsView({
                                 </button>
                               </>
                             ) : (
-                              <button
-                                onClick={() => {
-                                  setEditingCompany(c.id);
-                                  setEditCompanyData({ name: c.name });
-                                }}
-                                className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Pencil className="w-4 h-4" />
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setEditingCompany(c.id);
+                                    setEditCompanyData({ name: c.name });
+                                  }}
+                                  className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                {c.id !== 'itmanage' && (
+                                  <button
+                                    onClick={() => onDeleteCompany(c.id)}
+                                    className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                    title="Excluir Empresa"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         </td>
