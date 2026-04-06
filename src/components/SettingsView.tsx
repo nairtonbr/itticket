@@ -93,7 +93,7 @@ export default function SettingsView({
   }, [clientResponsibles]);
 
   const getCompanyClients = (companyId?: string) => {
-    const targetId = companyId || userProfile?.companyId;
+    const targetId = companyId || currentCompanyId || userProfile?.companyId;
     const targetCompany = companies.find(c => c.id === targetId);
     
     let custom: string[] = [];
@@ -110,7 +110,7 @@ export default function SettingsView({
       return ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"].sort();
     }
 
-    return [...CLIENTS].sort();
+    return [];
   };
 
   useEffect(() => {
@@ -315,7 +315,7 @@ export default function SettingsView({
     let newCustom: string[] = [];
     if (customClients.length > 0) {
       newCustom = customClients.filter(c => c !== client);
-    } else if (userProfile?.companyId === 'itmanage') {
+    } else if (currentCompanyId === 'itmanage') {
       // Se for itmanage e não tiver customClients, inicializa com os defaults menos o excluído
       const defaults = ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"];
       newCustom = defaults.filter(c => c !== client);
@@ -493,7 +493,7 @@ export default function SettingsView({
             }`}
           >
             <ShieldAlert className="w-4 h-4" />
-            Super Admin
+            Mult-Empresa
           </button>
         )}
       </div>
@@ -966,11 +966,7 @@ export default function SettingsView({
                 className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm space-y-6 relative group"
               >
                 <button 
-                  onClick={() => {
-                    if (window.confirm(`Tem certeza que deseja excluir o cliente "${client}"?`)) {
-                      handleRemoveClient(client);
-                    }
-                  }}
+                  onClick={() => handleRemoveClient(client)}
                   className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-red-500 transition-all"
                   title="Remover Cliente"
                 >
@@ -1158,7 +1154,7 @@ export default function SettingsView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-                {users.map((u) => (
+                {users.filter(u => u.companyId === currentCompanyId).map((u) => (
                   <tr key={u.uid} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -1293,7 +1289,7 @@ export default function SettingsView({
               <div className="p-2 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg">
                 <ShieldAlert className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Ferramentas de Super Admin</h3>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Ferramentas Mult-Empresa</h3>
             </div>
             
             <div className="p-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30 space-y-4">

@@ -47,11 +47,11 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && 
         (getUserData().role == 'superadmin' || 
-         request.auth.token.email == "nairtonbraga00@gmail.com");
+         request.auth.token.email.lower() == "nairtonbraga00@gmail.com");
     }
 
     function hasRole(role) {
-      return userExists() && getUserData().role == role;
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
 
     function isAdmin() {
@@ -67,7 +67,7 @@ service cloud.firestore {
     }
 
     function getCompanyId() {
-      return getUserData().companyId;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
     }
 
     function belongsToCompany(companyId) {
@@ -90,7 +90,8 @@ service cloud.firestore {
       // Superadmins can do anything
       // Admins/Users/Clients can read their own company
       allow read: if belongsToCompany(companyId);
-      allow write: if isSuperAdmin();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (isAdmin() && belongsToCompany(companyId));
     }
 
     match /users/{userId} {

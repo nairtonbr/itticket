@@ -122,7 +122,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ isAdmin, schedules, 
   };
 
   const handleDeleteScheduleClick = async (id: string) => {
-    if (!confirm("Deseja excluir esta escala?")) return;
     await onDelete(id);
   };
 

@@ -144,7 +144,7 @@ export default function App() {
       return ["Avançar", "Bixnet", "Brasilink", "Iplay", "Jrnet", "Meconnect", "Nexo", "Prosseguir"].sort();
     }
     
-    return [...CLIENTS].sort();
+    return [];
   }, [settings.customClients, currentCompanyId]);
 
   const allCategories = React.useMemo(() => {
@@ -659,7 +659,6 @@ export default function App() {
       toast.error("A empresa principal não pode ser excluída.");
       return;
     }
-    if (!window.confirm(`Tem certeza que deseja excluir a empresa "${id}"? Esta ação é irreversível.`)) return;
     
     try {
       await deleteDoc(doc(db, "companies", id));
