@@ -122,5 +122,9 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || resourceBelongsToUserCompany();
       allow write: if isSuperAdmin() || (isAdmin() && requestBelongsToUserCompany());
     }
+
+    match /backups/{backupId} {
+      allow read, write: if isSuperAdmin();
+    }
   }
 }

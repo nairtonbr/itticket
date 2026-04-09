@@ -91,6 +91,7 @@ export default function App() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [backups, setBackups] = useState<any[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -171,6 +172,16 @@ export default function App() {
       hour: "numeric",
       hour12: false
     }).format(now));
+
+    // Daily Backup Check (Admin/Super Admin)
+    if ((userProfile?.role === 'superadmin' || userProfile?.role === 'admin') && brasiliaHour >= 9 && currentCompanyId) {
+      const backupId = `${brasiliaDate}_${currentCompanyId}`;
+      const backupDoc = await getDoc(doc(db, "backups", backupId));
+      if (!backupDoc.exists()) {
+        console.log(`[BACKUP] Iniciando backup automático da empresa ${currentCompanyId} do dia ${brasiliaDate}`);
+        handleCreateBackup();
+      }
+    }
 
     // Only run if it's 09:00 Brasília time or later, and hasn't run today
     // We also check if the user is an admin because only admins can update the global settings
@@ -512,6 +523,8 @@ export default function App() {
 
     // Companies Subscription (Super Admin only)
     let unsubCompanies = () => {};
+    // Backups Subscription (Super Admin only - Global view of all backups)
+    let unsubBackups = () => {};
     if (userProfile.role === 'superadmin') {
       unsubCompanies = onSnapshot(
         collection(db, "companies"),
@@ -522,6 +535,23 @@ export default function App() {
           })) as Company[];
           setCompanies(companiesData);
         }, (error) => handleFirestoreError(error, OperationType.LIST, "companies"));
+
+      unsubBackups = onSnapshot(
+        query(collection(db, "backups"), orderBy("timestamp", "desc")),
+        (snapshot) => {
+          setBackups(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        }, (error) => handleFirestoreError(error, OperationType.LIST, "backups"));
+    } else if (userProfile.role === 'admin' && currentCompanyId) {
+      // Admins see backups for their company
+      unsubBackups = onSnapshot(
+        query(
+          collection(db, "backups"), 
+          where("companyId", "==", currentCompanyId),
+          orderBy("timestamp", "desc")
+        ),
+        (snapshot) => {
+          setBackups(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        }, (error) => handleFirestoreError(error, OperationType.LIST, "backups"));
     }
 
     return () => {
@@ -530,6 +560,7 @@ export default function App() {
       unsubSchedules();
       unsubUsers();
       unsubCompanies();
+      unsubBackups();
     };
   }, [user, userProfile, showArchived, currentCompanyId, selectedCompanyId]);
 
@@ -665,6 +696,113 @@ export default function App() {
       toast.success("Empresa excluída com sucesso!");
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `companies/${id}`);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    if (!currentCompanyId || (userProfile?.role !== 'superadmin' && userProfile?.role !== 'admin')) return;
+    const toastId = toast.loading("Criando backup da empresa...");
+    try {
+      const now = new Date();
+      const brasiliaDate = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).format(now);
+
+      const companyId = currentCompanyId;
+      const backupId = `${brasiliaDate}_${companyId}`;
+
+      // Fetch only data for this company
+      const [ticketsSnap, usersSnap, schedulesSnap, companySnap] = await Promise.all([
+        getDocs(query(collection(db, "tickets"), where("companyId", "==", companyId))),
+        getDocs(query(collection(db, "users"), where("companyId", "==", companyId))),
+        getDocs(query(collection(db, "schedules"), where("companyId", "==", companyId))),
+        getDoc(doc(db, "companies", companyId))
+      ]);
+
+      const backupData = {
+        timestamp: now.toISOString(),
+        companyId: companyId,
+        date: brasiliaDate,
+        tickets: ticketsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        users: usersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        schedules: schedulesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        company: companySnap.exists() ? { id: companySnap.id, ...companySnap.data() } : null
+      };
+
+      await setDoc(doc(db, "backups", backupId), backupData);
+
+      // Cleanup old backups for THIS company (> 7 days)
+      const backupsSnap = await getDocs(query(
+        collection(db, "backups"), 
+        where("companyId", "==", companyId),
+        orderBy("timestamp", "asc")
+      ));
+      
+      if (backupsSnap.size > 7) {
+        const toDelete = backupsSnap.docs.slice(0, backupsSnap.size - 7);
+        const batch = writeBatch(db);
+        toDelete.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      toast.success("Backup da empresa criado com sucesso!", { id: toastId });
+    } catch (error) {
+      console.error("Backup error:", error);
+      toast.error("Erro ao criar backup", { id: toastId });
+    }
+  };
+
+  const handleRestoreBackup = async (backupId: string) => {
+    if (!currentCompanyId || (userProfile?.role !== 'superadmin' && userProfile?.role !== 'admin')) return;
+    
+    const toastId = toast.loading("Restaurando backup da empresa...");
+    try {
+      const backupSnap = await getDoc(doc(db, "backups", backupId));
+      if (!backupSnap.exists()) {
+        toast.error("Backup não encontrado", { id: toastId });
+        return;
+      }
+
+      const backup = backupSnap.data();
+      const companyId = backup.companyId;
+
+      // Collections to restore
+      const collections = ["tickets", "users", "schedules"];
+      
+      for (const coll of collections) {
+        // Delete current company data in this collection
+        const snap = await getDocs(query(collection(db, coll), where("companyId", "==", companyId)));
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        
+        // Restore from backup
+        const data = backup[coll] || [];
+        for (let i = 0; i < data.length; i += 400) {
+          const chunk = data.slice(i, i + 400);
+          const restoreBatch = writeBatch(db);
+          chunk.forEach((item: any) => {
+            const { id, ...rest } = item;
+            restoreBatch.set(doc(db, coll, id), rest);
+          });
+          await restoreBatch.commit();
+        }
+      }
+
+      // Restore company settings
+      if (backup.company) {
+        const { id, ...companyData } = backup.company;
+        await setDoc(doc(db, "companies", id), companyData);
+      }
+
+      toast.success("Empresa restaurada com sucesso! Recarregando...", { id: toastId });
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (error) {
+      console.error("Restore error:", error);
+      toast.error("Erro ao restaurar backup", { id: toastId });
     }
   };
 
@@ -1641,6 +1779,9 @@ export default function App() {
                 onCreateCompany={handleCreateCompany}
                 onUpdateCompany={handleUpdateCompany}
                 onDeleteCompany={handleDeleteCompany}
+                backups={backups}
+                onCreateBackup={handleCreateBackup}
+                onRestoreBackup={handleRestoreBackup}
                 companies={companies}
                 darkMode={darkMode}
                 setDarkMode={setDarkMode}

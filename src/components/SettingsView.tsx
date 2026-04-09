@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette, Pencil } from "lucide-react";
+import { Save, Webhook, Users as UsersIcon, Building2, Image as ImageIcon, Plus, Trash2, UserPlus, Shield, User, Globe, CheckCircle2, AlertCircle, ShieldAlert, Sun, Moon, Palette, Pencil, Database, History, RotateCcw } from "lucide-react";
 import { AppSettings, ClientName, UserProfile, UserRole, TicketStatus, Company } from "../types";
 import { CLIENTS, STATUSES } from "../constants";
 import { testWhatsAppConnection, checkInstanceStatus } from "../utils/whatsappUtils";
@@ -20,6 +20,9 @@ interface SettingsViewProps {
   onCreateCompany: (companyData: Partial<Company>) => Promise<void>;
   onUpdateCompany: (id: string, data: Partial<Company>) => Promise<void>;
   onDeleteCompany: (id: string) => Promise<void>;
+  backups: any[];
+  onCreateBackup: () => Promise<void>;
+  onRestoreBackup: (backupId: string) => Promise<void>;
   companies: Company[];
   darkMode: boolean;
   setDarkMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -40,6 +43,9 @@ export default function SettingsView({
   onCreateCompany,
   onUpdateCompany,
   onDeleteCompany,
+  backups,
+  onCreateBackup,
+  onRestoreBackup,
   companies,
   darkMode, 
   setDarkMode,
@@ -79,6 +85,7 @@ export default function SettingsView({
   const [editData, setEditData] = useState<Partial<UserProfile>>({});
   const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [editCompanyData, setEditCompanyData] = useState<Partial<Company>>({});
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [testNumber, setTestNumber] = useState("");
   const [isTesting, setIsTesting] = useState(false);
@@ -617,6 +624,94 @@ export default function SettingsView({
                 <p className="text-sm text-zinc-400 italic">Nenhuma categoria personalizada adicionada.</p>
               )}
             </div>
+
+            {/* Backups Section (Super Admin only) */}
+            {userProfile?.role === 'superadmin' && (
+              <div className="pt-12 border-t border-zinc-100 dark:border-zinc-800 space-y-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 rounded-lg">
+                      <Database className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Backups do Sistema</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">Gerencie backups diários e restaure o estado do sistema.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onCreateBackup}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm shadow-amber-500/20"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Criar Backup Agora
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {backups.length > 0 ? (
+                    backups.map((backup) => (
+                      <div 
+                        key={backup.id} 
+                        className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 flex items-center justify-between group hover:border-amber-200 dark:hover:border-amber-900/50 transition-all"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 bg-white dark:bg-zinc-800 rounded-xl border border-zinc-100 dark:border-zinc-700 text-zinc-400">
+                            <History className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-zinc-900 dark:text-white">
+                              {new Date(backup.id + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                              Realizado em: {new Date(backup.timestamp).toLocaleString('pt-BR')}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {showRestoreConfirm === backup.id ? (
+                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4">
+                              <span className="text-xs font-bold text-amber-600 dark:text-amber-400 mr-2">Tem certeza?</span>
+                              <button
+                                onClick={() => {
+                                  onRestoreBackup(backup.id);
+                                  setShowRestoreConfirm(null);
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                Sim, Restaurar
+                              </button>
+                              <button
+                                onClick={() => setShowRestoreConfirm(null)}
+                                className="bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowRestoreConfirm(backup.id)}
+                              className="opacity-0 group-hover:opacity-100 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 hover:text-amber-600 dark:hover:text-amber-400 hover:border-amber-200 dark:hover:border-amber-900/50 font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                              Restaurar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-800/20 rounded-3xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                      <Database className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto mb-3" />
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">Nenhum backup encontrado.</p>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-zinc-400 dark:text-zinc-500 text-center pt-2">
+                    * O sistema mantém automaticamente os backups dos últimos 7 dias.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
