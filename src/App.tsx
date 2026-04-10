@@ -22,7 +22,8 @@ import {
   Lock,
   Mail,
   ArrowUpDown,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  RotateCcw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "react-hot-toast";
@@ -32,6 +33,7 @@ import TicketModal from "./components/TicketModal";
 import SettingsView from "./components/SettingsView";
 import { ReportsView } from "./components/ReportsView";
 import { ScheduleView } from "./components/ScheduleView";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { Ticket, TicketStatus, ClientName, AppSettings, UserProfile, Company } from "./types";
 import { CLIENTS, STATUSES, CATEGORIES } from "./constants";
 import { getTicketSlaStatus, sendWebhook } from "./utils/ticketUtils";
@@ -75,6 +77,7 @@ export default function App() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState("");
@@ -368,12 +371,29 @@ export default function App() {
 
   // Firebase Auth Observer
   useEffect(() => {
+    console.log("Setting up Auth observer...");
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser?.email);
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          setAuthError(null);
+          console.log("Fetching user doc for UID:", firebaseUser.uid);
+          let userDoc;
+          try {
+            const userRef = doc(db, "users", firebaseUser.uid);
+            console.log("User Ref Path:", userRef.path);
+            userDoc = await getDoc(userRef);
+            console.log("getDoc successful, exists:", userDoc.exists());
+          } catch (e) {
+            console.error("Critical error in getDoc(users):", e);
+            // Log more details about the auth state
+            console.log("Current Auth User:", auth.currentUser?.uid, auth.currentUser?.email);
+            handleFirestoreError(e, OperationType.GET, `users/${firebaseUser.uid}`);
+            return;
+          }
           
           if (userDoc.exists()) {
+            console.log("User doc exists");
             let profile = userDoc.data() as UserProfile;
             
             // Bootstrap superadmin by email
@@ -386,12 +406,14 @@ export default function App() {
 
             // Fetch company data
             if (profile.companyId) {
+              console.log("Fetching company doc:", profile.companyId);
               const companyDoc = await getDoc(doc(db, "companies", profile.companyId));
               if (companyDoc.exists()) {
                 setCompany(companyDoc.data() as Company);
               }
             }
           } else {
+            console.log("User doc does not exist, creating...");
             // New user - default to ITMANAGE for now or pending
             const defaultCompanyId = "itmanage";
             const profile: UserProfile = {
@@ -412,12 +434,15 @@ export default function App() {
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
+          setAuthError(error instanceof Error ? error.message : "Erro ao carregar perfil do usuário");
         }
       } else {
+        console.log("No user authenticated");
         setUser(null);
         setUserProfile(null);
         setCompany(null);
       }
+      console.log("Auth check complete, setting loading to false");
       setLoading(false);
     });
 
@@ -1439,6 +1464,33 @@ export default function App() {
     );
   }
 
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-[2.5rem] shadow-2xl p-8 md:p-12 border border-zinc-100 dark:border-zinc-800 text-center">
+          <div className="w-20 h-20 bg-red-100 dark:bg-red-900/20 rounded-3xl flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+          </div>
+          <h1 className="text-2xl font-black text-zinc-900 dark:text-white tracking-tight mb-2">Erro de Autenticação</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 font-medium mb-8">{authError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-4 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-xl shadow-blue-200 dark:shadow-none"
+          >
+            <RotateCcw className="w-5 h-5" />
+            Recarregar Página
+          </button>
+          <button
+            onClick={() => auth.signOut()}
+            className="w-full mt-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white font-bold py-4 rounded-2xl transition-all"
+          >
+            Sair da Conta
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!userProfile) {
     return (
       <div className={`flex items-center justify-center h-screen bg-zinc-50 dark:bg-zinc-950 ${darkMode ? 'dark' : ''}`}>
@@ -1479,8 +1531,9 @@ export default function App() {
   }
 
   return (
-    <div className={`h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900`}>
-      <Toaster position="top-right" />
+    <ErrorBoundary>
+      <div className={`h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950 flex font-sans selection:bg-blue-100 selection:text-blue-900`}>
+        <Toaster position="top-right" />
       {/* Sidebar */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
@@ -2084,5 +2137,6 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+    </ErrorBoundary>
   );
 }

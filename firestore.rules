@@ -41,13 +41,16 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data : {"role": "none", "companyId": "none"};
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && 
-        (getUserData().role == 'superadmin' || 
-         request.auth.token.email.lower() == "nairtonbraga00@gmail.com");
+      return isAuthenticated() && (
+        (request.auth.token.email == "nairtonbraga00@gmail.com") || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin')
+      );
     }
 
     function hasRole(role) {
@@ -67,7 +70,8 @@ service cloud.firestore {
     }
 
     function getCompanyId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId;
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data.companyId : "none";
     }
 
     function belongsToCompany(companyId) {
@@ -95,15 +99,18 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if (isAuthenticated() && request.auth.uid == userId) || isSuperAdmin() || (isAdmin() && getUserData().companyId == get(/databases/$(database)/documents/users/$(userId)).data.companyId);
+      // Allow user to read their own profile first to avoid helper function overhead/failures
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isSuperAdmin();
+      allow read: if isAdmin() && exists(/databases/$(database)/documents/users/$(userId)) && getCompanyId() == get(/databases/$(database)/documents/users/$(userId)).data.companyId;
       
-      allow create: if isAuthenticated() && 
-                    (isSuperAdmin() || (request.auth.uid == userId && request.resource.data.role == 'pending'));
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
       
-      allow update: if isAuthenticated() && 
-                    (isSuperAdmin() || 
-                     (isAdmin() && getCompanyId() == resource.data.companyId && request.resource.data.role != 'superadmin') || 
-                     (request.auth.uid == userId && request.resource.data.role == resource.data.role));
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() || 
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        (isAdmin() && getCompanyId() == resource.data.companyId && request.resource.data.role != 'superadmin')
+      );
     }
 
     match /tickets/{ticketId} {
