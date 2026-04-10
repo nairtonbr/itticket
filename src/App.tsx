@@ -53,6 +53,7 @@ import {
   updateDoc, 
   deleteDoc, 
   getDoc,
+  getDocFromServer,
   getDocs,
   Timestamp,
   addDoc,
@@ -107,6 +108,27 @@ export default function App() {
 
   const normalize = (str?: string) => str?.trim().toLowerCase();
   
+  // Test connection on mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const dbInfo = {
+          projectId: db.app.options.projectId,
+          databaseId: (db as any)._databaseId?.database || '(default)',
+          apiKey: db.app.options.apiKey?.substring(0, 5) + "..."
+        };
+        console.log("Testing Firestore connection...", dbInfo);
+        
+        // This will likely fail with permission error if not allowed, but it tests reachability
+        await getDocFromServer(doc(db, "_test_connection_", "ping"));
+        console.log("Firestore connection test successful");
+      } catch (e) {
+        console.log("Firestore connection test finished (expected failure or success):", e instanceof Error ? e.message : String(e));
+      }
+    };
+    testConnection();
+  }, []);
+
   // Refs to avoid stale closures in SLA monitor
   const ticketsRef = useRef<Ticket[]>([]);
   const settingsRef = useRef<AppSettings>(settings);
@@ -178,12 +200,19 @@ export default function App() {
 
     // Daily Backup Check (Admin/Super Admin)
     if ((userProfile?.role === 'superadmin' || userProfile?.role === 'admin') && brasiliaHour >= 9 && currentCompanyId) {
-      const backupId = `${brasiliaDate}_${currentCompanyId}`;
-      const backupDoc = await getDoc(doc(db, "backups", backupId));
-      if (!backupDoc.exists()) {
-        console.log(`[BACKUP] Iniciando backup automático da empresa ${currentCompanyId} do dia ${brasiliaDate}`);
-        handleCreateBackup();
-      }
+      const checkBackup = async () => {
+        try {
+          const backupId = `${brasiliaDate}_${currentCompanyId}`;
+          const backupDoc = await getDoc(doc(db, "backups", backupId));
+          if (!backupDoc.exists()) {
+            console.log(`[BACKUP] Iniciando backup automático da empresa ${currentCompanyId} do dia ${brasiliaDate}`);
+            handleCreateBackup();
+          }
+        } catch (e) {
+          console.error("[BACKUP] Error checking for daily backup:", e);
+        }
+      };
+      checkBackup();
     }
 
     // Only run if it's 09:00 Brasília time or later, and hasn't run today
@@ -372,78 +401,121 @@ export default function App() {
   // Firebase Auth Observer
   useEffect(() => {
     console.log("Setting up Auth observer...");
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       console.log("Auth state changed:", firebaseUser?.email);
       if (firebaseUser) {
-        try {
-          setAuthError(null);
-          console.log("Fetching user doc for UID:", firebaseUser.uid);
-          let userDoc;
-          try {
-            const userRef = doc(db, "users", firebaseUser.uid);
-            console.log("User Ref Path:", userRef.path);
-            userDoc = await getDoc(userRef);
-            console.log("getDoc successful, exists:", userDoc.exists());
-          } catch (e) {
-            console.error("Critical error in getDoc(users):", e);
-            // Log more details about the auth state
-            console.log("Current Auth User:", auth.currentUser?.uid, auth.currentUser?.email);
-            handleFirestoreError(e, OperationType.GET, `users/${firebaseUser.uid}`);
-            return;
-          }
-          
-          if (userDoc.exists()) {
-            console.log("User doc exists");
-            let profile = userDoc.data() as UserProfile;
+        console.log("Firebase Auth State: User logged in", {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          emailVerified: firebaseUser.emailVerified
+        });
+        setUser(firebaseUser);
+        setAuthError(null);
+        
+        const userRef = doc(db, "users", firebaseUser.uid);
+        
+        // Use onSnapshot for real-time profile updates and more robust initial load
+        const unsubProfile = onSnapshot(userRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            console.log("User profile loaded via snapshot:", docSnap.id);
+            let profile = docSnap.data() as UserProfile;
             
             // Bootstrap superadmin by email
             if (firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com") {
               profile.role = "superadmin";
             }
-
-            setUser(firebaseUser);
+            
             setUserProfile(profile);
-
-            // Fetch company data
+            
+            // Fetch company data if needed
             if (profile.companyId) {
-              console.log("Fetching company doc:", profile.companyId);
-              const companyDoc = await getDoc(doc(db, "companies", profile.companyId));
-              if (companyDoc.exists()) {
-                setCompany(companyDoc.data() as Company);
+              try {
+                const companyDoc = await getDoc(doc(db, "companies", profile.companyId));
+                if (companyDoc.exists()) {
+                  setCompany(companyDoc.data() as Company);
+                }
+              } catch (e) {
+                console.error("Error fetching company data:", e);
               }
             }
+            
+            setLoading(false);
           } else {
-            console.log("User doc does not exist, creating...");
-            // New user - default to ITMANAGE for now or pending
-            const defaultCompanyId = "itmanage";
-            const profile: UserProfile = {
-              uid: firebaseUser.uid,
-              companyId: defaultCompanyId,
-              email: firebaseUser.email || "",
-              displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
-              role: firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com" ? "superadmin" : "pending"
-            };
-            await setDoc(doc(db, "users", firebaseUser.uid), profile);
-            setUser(firebaseUser);
-            setUserProfile(profile);
+            console.log("User profile does not exist, creating...");
+            try {
+              const defaultCompanyId = "itmanage";
+              
+              // Check if default company exists, if not create it
+              const companyRef = doc(db, "companies", defaultCompanyId);
+              const companySnap = await getDoc(companyRef);
+              if (!companySnap.exists()) {
+                await setDoc(companyRef, {
+                  id: defaultCompanyId,
+                  name: "IT Manage",
+                  active: true,
+                  createdAt: new Date().toISOString(),
+                  settings: {
+                    webhookUrl: "",
+                    clientLogos: {},
+                    clientResponsibles: {},
+                    customClients: [],
+                    customCategories: []
+                  }
+                });
+              }
 
-            const companyDoc = await getDoc(doc(db, "companies", defaultCompanyId));
-            if (companyDoc.exists()) {
-              setCompany(companyDoc.data() as Company);
+              const profile: UserProfile = {
+                uid: firebaseUser.uid,
+                companyId: defaultCompanyId,
+                email: firebaseUser.email || "",
+                displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "Usuário",
+                role: firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com" ? "superadmin" : "pending"
+              };
+              await setDoc(userRef, profile);
+              console.log("User profile and default company ensured");
+            } catch (e) {
+              console.error("Error creating user profile:", e);
+              setAuthError("Erro ao criar perfil de usuário. Verifique as permissões.");
+              setLoading(false);
             }
           }
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setAuthError(error instanceof Error ? error.message : "Erro ao carregar perfil do usuário");
-        }
+        }, async (error) => {
+          console.error("User profile snapshot error:", error);
+          
+          // Fallback to getDocFromServer if snapshot fails
+          try {
+            console.log("Attempting fallback profile load via getDocFromServer...");
+            const docSnap = await getDocFromServer(userRef);
+            if (docSnap.exists()) {
+              console.log("User profile loaded via fallback:", docSnap.id);
+              let profile = docSnap.data() as UserProfile;
+              if (firebaseUser.email?.toLowerCase() === "nairtonbraga00@gmail.com") {
+                profile.role = "superadmin";
+              }
+              setUserProfile(profile);
+              setLoading(false);
+              return;
+            }
+          } catch (fallbackError) {
+            console.error("Fallback profile load failed:", fallbackError);
+          }
+
+          // Only show error if we don't have a profile yet to avoid flickering on transient errors
+          if (!userProfile) {
+            setAuthError(`Erro de permissão ao acessar perfil: ${error.message}`);
+          }
+          setLoading(false);
+        });
+
+        return () => unsubProfile();
       } else {
         console.log("No user authenticated");
         setUser(null);
         setUserProfile(null);
         setCompany(null);
+        setAuthError(null);
+        setLoading(false);
       }
-      console.log("Auth check complete, setting loading to false");
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -465,13 +537,19 @@ export default function App() {
 
   // Real-time Data Fetching (Firestore)
   useEffect(() => {
-    if (!user || !userProfile || !currentCompanyId) return;
+    if (!user || !userProfile) return;
+    if (userProfile.role !== 'superadmin' && !currentCompanyId) return;
 
-    const companyId = currentCompanyId;
+    const companyId = currentCompanyId || userProfile.companyId;
 
     // Tickets Subscription
     let ticketsQuery;
-    if (userProfile.role === 'admin' || userProfile.role === 'user' || userProfile.associatedClient === 'Todos' || userProfile.role === 'superadmin') {
+    if (userProfile.role === 'superadmin' && !selectedCompanyId) {
+      ticketsQuery = query(
+        collection(db, "tickets"),
+        orderBy("createdAt", "desc")
+      );
+    } else if (userProfile.role === 'admin' || userProfile.role === 'user' || userProfile.associatedClient === 'Todos' || userProfile.role === 'superadmin') {
       ticketsQuery = query(
         collection(db, "tickets"),
         where("companyId", "==", companyId),
@@ -486,6 +564,7 @@ export default function App() {
     }
 
     const unsubTickets = onSnapshot(ticketsQuery, (snapshot) => {
+      console.log(`Tickets snapshot received: ${snapshot.size} tickets found for company ${companyId}`);
       const ticketsData = snapshot.docs.map(doc => ({
         ...doc.data(),
         id: doc.id
@@ -493,40 +572,63 @@ export default function App() {
       setTickets(ticketsData);
     }, (error) => handleFirestoreError(error, OperationType.LIST, "tickets"));
 
+    // List all companies for superadmin to help find missing data
+    if (userProfile.role === 'superadmin') {
+      getDocs(collection(db, "companies")).then(snap => {
+        console.log("All companies in database:", snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      getDocs(collection(db, "tickets")).then(snap => {
+        console.log(`Total tickets in database (all companies): ${snap.size}`);
+      });
+      getDocs(collection(db, "users")).then(snap => {
+        console.log(`Total users in database: ${snap.size}`, snap.docs.map(d => d.id));
+      });
+    }
+
     // Settings Subscription (Now from Company document)
-    const unsubSettings = onSnapshot(doc(db, "companies", companyId), (doc) => {
-      if (doc.exists()) {
-        const companyData = doc.data() as Company;
-        const data = (companyData.settings || {}) as Partial<AppSettings>;
-        setCompany(companyData);
-        setSettings(prev => ({ 
-          ...prev, 
-          ...data,
-          whatsappClientsList: data.whatsappClientsList || [],
-          whatsappResponsiblesList: data.whatsappResponsiblesList || [],
-          clientLogos: data.clientLogos || {},
-          clientResponsibles: data.clientResponsibles || {},
-          customClients: data.customClients || [],
-          customCategories: data.customCategories || [],
-          disabledSlaClients: data.disabledSlaClients || []
-        }));
-      }
-    }, (error) => handleFirestoreError(error, OperationType.GET, `companies/${companyId}`));
+    let unsubSettings = () => {};
+    if (companyId) {
+      unsubSettings = onSnapshot(doc(db, "companies", companyId), (doc) => {
+        if (doc.exists()) {
+          const companyData = doc.data() as Company;
+          const data = (companyData.settings || {}) as Partial<AppSettings>;
+          setCompany(companyData);
+          setSettings(prev => ({ 
+            ...prev, 
+            ...data,
+            whatsappClientsList: data.whatsappClientsList || [],
+            whatsappResponsiblesList: data.whatsappResponsiblesList || [],
+            clientLogos: data.clientLogos || {},
+            clientResponsibles: data.clientResponsibles || {},
+            customClients: data.customClients || [],
+            customCategories: data.customCategories || [],
+            disabledSlaClients: data.disabledSlaClients || []
+          }));
+        }
+      }, (error) => handleFirestoreError(error, OperationType.GET, `companies/${companyId}`));
+    }
 
     // Schedules Subscription
-    const unsubSchedules = onSnapshot(
-      query(
-        collection(db, "schedules"), 
-        where("companyId", "==", companyId),
-        orderBy("date", "asc")
-      ), 
-      (snapshot) => {
-        const schedulesData = snapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id
-        }));
-        setSchedules(schedulesData);
-      }, (error) => handleFirestoreError(error, OperationType.LIST, "schedules"));
+    let unsubSchedules = () => {};
+    if (companyId || userProfile.role === 'superadmin') {
+      const schedulesQuery = (userProfile.role === 'superadmin' && !selectedCompanyId)
+        ? query(collection(db, "schedules"), orderBy("date", "asc"))
+        : query(
+            collection(db, "schedules"), 
+            where("companyId", "==", companyId),
+            orderBy("date", "asc")
+          );
+
+      unsubSchedules = onSnapshot(
+        schedulesQuery, 
+        (snapshot) => {
+          const schedulesData = snapshot.docs.map(doc => ({
+            ...doc.data(),
+            id: doc.id
+          }));
+          setSchedules(schedulesData);
+        }, (error) => handleFirestoreError(error, OperationType.LIST, "schedules"));
+    }
 
     // Users Subscription (Admin only)
     let unsubUsers = () => {};
@@ -1656,24 +1758,25 @@ export default function App() {
             <div className="hidden md:block">
               <h2 className="text-xl font-black text-zinc-900 dark:text-white tracking-tight flex items-center gap-2">
                 {greeting}, {userProfile?.displayName?.split(' ')[0]}!
-                {company?.name && (
+                {company?.name ? (
                   <div className="flex items-center gap-2">
                     <span className="ml-2 px-2 py-0.5 bg-blue-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest shadow-lg shadow-blue-500/20">
-                      {company.name}
+                      {selectedCompanyId ? company.name : "Visão Global"}
                     </span>
-                    {userProfile?.role === 'superadmin' && companies.length > 1 && (
-                      <select
-                        value={selectedCompanyId || ""}
-                        onChange={(e) => setSelectedCompanyId(e.target.value)}
-                        className="ml-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
-                      >
-                        {companies.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                {userProfile?.role === 'superadmin' && (
+                  <select
+                    value={selectedCompanyId || ""}
+                    onChange={(e) => setSelectedCompanyId(e.target.value || null)}
+                    className="ml-4 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+                  >
+                    <option value="">Todas as Empresas</option>
+                    {companies.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
                 )}
+                  </div>
+                ) : null}
                 {isOnDuty && (
                   <span className="ml-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse shadow-lg shadow-red-500/20">
                     Plantonista

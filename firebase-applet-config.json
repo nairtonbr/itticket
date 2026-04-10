@@ -1,10 +1,10 @@
 {
-  "projectId": "itticket-5712f",
-  "appId": "1:654608680459:web:4eff385158b38056aa690e",
-  "apiKey": "AIzaSyBm9VC75Ht4rC0pZe2eolh_seEax62XL6I",
-  "authDomain": "itticket-5712f.firebaseapp.com",
-  "firestoreDatabaseId": "(default)",
-  "storageBucket": "itticket-5712f.firebasestorage.app",
-  "messagingSenderId": "654608680459",
-  "measurementId": "G-EMPMCKHPGR"
+  "projectId": "gen-lang-client-0411844635",
+  "appId": "1:942367643265:web:5291bd1354e14813dedf80",
+  "apiKey": "AIzaSyCkMFzxixeBVA-HqNP16ISxZ3aGTVZT5mk",
+  "authDomain": "gen-lang-client-0411844635.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-17e4d5da-6ec3-4a02-a582-18882db82354",
+  "storageBucket": "gen-lang-client-0411844635.firebasestorage.app",
+  "messagingSenderId": "942367643265",
+  "measurementId": ""
 }

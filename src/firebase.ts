@@ -12,7 +12,9 @@ try {
     throw new Error("Configuração do Firebase ausente ou inválida no arquivo firebase-applet-config.json");
   }
   app = initializeApp(firebaseConfig);
-  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)" 
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId) 
+    : getFirestore(app);
   auth = getAuth(app);
 } catch (error) {
   console.error("Erro ao inicializar Firebase:", error);
